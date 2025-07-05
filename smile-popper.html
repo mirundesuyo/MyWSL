@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スマイルつぶしゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #87CEEB, #98D8C8);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+        
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,255,255,0.9);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            display: none;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        #gameOver h2 {
+            margin: 0 0 20px 0;
+            color: #333;
+        }
+        
+        #restartBtn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        #restartBtn:hover {
+            background: #45a049;
+        }
+        
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="score">スコア: 0</div>
+    <div id="gameOver">
+        <h2>ゲームオーバー！</h2>
+        <p>最終スコア: <span id="finalScore">0</span></p>
+        <button id="restartBtn">もう一度遊ぶ</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const gameOverDiv = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const restartBtn = document.getElementById('restartBtn');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let score = 0;
+        let gameRunning = true;
+        let smileBalls = [];
+        let particles = [];
+        let spawnInterval;
+        let gameTime = 0;
+
+        class SmileBall {
+            constructor() {
+                this.radius = Math.random() * 30 + 20;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = -this.radius;
+                this.speed = Math.random() * 2 + 1;
+                this.color = `hsl(${Math.random() * 60 + 30}, 100%, 50%)`;
+                this.isBomb = Math.random() < 0.2; // 20%の確率で爆弾
+            }
+
+            update() {
+                this.y += this.speed;
+                
+                if (gameTime > 10000) {
+                    this.speed += 0.01;
+                }
+            }
+
+            draw() {
+                if (this.isBomb) {
+                    // 爆弾の描画
+                    ctx.fillStyle = '#333';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 爆弾の導火線
+                    ctx.strokeStyle = '#8B4513';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y - this.radius);
+                    ctx.lineTo(this.x + 5, this.y - this.radius - 15);
+                    ctx.stroke();
+                    
+                    // 火花
+                    ctx.fillStyle = '#FF4500';
+                    ctx.beginPath();
+                    ctx.arc(this.x + 5, this.y - this.radius - 15, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // ドクロマーク
+                    ctx.fillStyle = 'white';
+                    ctx.font = `${this.radius}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('💀', this.x, this.y);
+                } else {
+                    // ボールの本体
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // 目
+                    ctx.fillStyle = 'black';
+                    ctx.beginPath();
+                    ctx.arc(this.x - this.radius * 0.3, this.y - this.radius * 0.2, this.radius * 0.1, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.radius * 0.3, this.y - this.radius * 0.2, this.radius * 0.1, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // スマイル
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI);
+                    ctx.stroke();
+                }
+            }
+
+            isClicked(mouseX, mouseY) {
+                const distance = Math.sqrt((mouseX - this.x) ** 2 + (mouseY - this.y) ** 2);
+                return distance <= this.radius;
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = (Math.random() - 0.5) * 10;
+                this.radius = Math.random() * 5 + 2;
+                this.color = color;
+                this.life = 1;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.3;
+                this.life -= 0.02;
+                this.radius *= 0.98;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function spawnSmileBall() {
+            if (gameRunning) {
+                smileBalls.push(new SmileBall());
+            }
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (gameRunning) {
+                gameTime += 16;
+                
+                // スマイルボールの更新と描画
+                for (let i = smileBalls.length - 1; i >= 0; i--) {
+                    const ball = smileBalls[i];
+                    ball.update();
+                    ball.draw();
+                    
+                    // 画面外に出たら
+                    if (ball.y - ball.radius > canvas.height) {
+                        if (!ball.isBomb) {
+                            // スマイルボールが落ちたらゲームオーバー
+                            gameOver();
+                        } else {
+                            // 爆弾が落ちたら削除するだけ
+                            smileBalls.splice(i, 1);
+                        }
+                    }
+                }
+                
+                // パーティクルの更新と描画
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const particle = particles[i];
+                    particle.update();
+                    particle.draw();
+                    
+                    if (particle.life <= 0) {
+                        particles.splice(i, 1);
+                    }
+                }
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(spawnInterval);
+            finalScoreDisplay.textContent = score;
+            gameOverDiv.style.display = 'block';
+        }
+
+        function restart() {
+            score = 0;
+            gameTime = 0;
+            scoreDisplay.textContent = 'スコア: 0';
+            smileBalls = [];
+            particles = [];
+            gameRunning = true;
+            gameOverDiv.style.display = 'none';
+            
+            spawnInterval = setInterval(() => {
+                spawnSmileBall();
+                
+                // 時間経過で難易度上昇
+                if (gameTime > 20000) {
+                    spawnSmileBall();
+                }
+            }, 1500);
+        }
+
+        canvas.addEventListener('click', (e) => {
+            if (!gameRunning) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            for (let i = smileBalls.length - 1; i >= 0; i--) {
+                const ball = smileBalls[i];
+                if (ball.isClicked(mouseX, mouseY)) {
+                    if (ball.isBomb) {
+                        // 爆弾をクリックしたらペナルティ
+                        score = Math.max(0, score - 50);
+                        scoreDisplay.textContent = `スコア: ${score}`;
+                        createParticles(ball.x, ball.y, '#FF0000');
+                        
+                        // 画面を赤く点滅
+                        document.body.style.background = '#FF6B6B';
+                        setTimeout(() => {
+                            document.body.style.background = 'linear-gradient(to bottom, #87CEEB, #98D8C8)';
+                        }, 200);
+                    } else {
+                        // スマイルボールをクリックしたら得点
+                        score += Math.floor(50 - ball.radius);
+                        scoreDisplay.textContent = `スコア: ${score}`;
+                        createParticles(ball.x, ball.y, ball.color);
+                    }
+                    smileBalls.splice(i, 1);
+                    break;
+                }
+            }
+        });
+
+        restartBtn.addEventListener('click', restart);
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // ゲーム開始
+        restart();
+        gameLoop();
+    </script>
+</body>
+</html>

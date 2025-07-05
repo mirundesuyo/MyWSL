@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自動マインスイーパー</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        #board {
+            display: inline-grid;
+            grid-template-columns: repeat(30, 25px);
+            gap: 1px;
+            background-color: #ccc;
+            padding: 10px;
+            margin: 20px 0;
+        }
+        .cell {
+            width: 25px;
+            height: 25px;
+            background-color: #e0e0e0;
+            border: 1px solid #999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .cell.revealed {
+            background-color: #fff;
+            border: 1px solid #ccc;
+        }
+        .cell.mine {
+            background-color: #ff6b6b;
+        }
+        .cell.flagged {
+            background-color: #4ecdc4;
+        }
+        .cell.flagged::after {
+            content: '🚩';
+        }
+        .cell.mine.revealed::after {
+            content: '💣';
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 0 5px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .info {
+            margin: 10px 0;
+            font-size: 18px;
+        }
+        .speed-control {
+            margin: 10px 0;
+        }
+        input[type="range"] {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>自動マインスイーパー</h1>
+        <div class="info">
+            <span>地雷: <span id="mineCount">99</span></span> | 
+            <span>フラグ: <span id="flagCount">0</span></span> | 
+            <span>状態: <span id="status">準備完了</span></span>
+        </div>
+        <div id="board"></div>
+        <div class="controls">
+            <button id="newGame">新しいゲーム</button>
+            <button id="autoPlay">自動プレイ開始</button>
+            <button id="stepPlay">ステップ実行</button>
+            <button id="stopAuto">停止</button>
+        </div>
+        <div class="speed-control">
+            <label for="speed">自動プレイ速度: <span id="speedValue">500</span>ms</label><br>
+            <input type="range" id="speed" min="50" max="2000" value="500" step="50">
+        </div>
+    </div>
+
+    <script>
+        class Minesweeper {
+            constructor(rows = 20, cols = 30, mines = 99) {
+                this.rows = rows;
+                this.cols = cols;
+                this.mineCount = mines;
+                this.board = [];
+                this.revealed = [];
+                this.flagged = [];
+                this.gameOver = false;
+                this.gameWon = false;
+                this.initBoard();
+            }
+
+            initBoard() {
+                // ボードの初期化
+                this.board = Array(this.rows).fill().map(() => Array(this.cols).fill(0));
+                this.revealed = Array(this.rows).fill().map(() => Array(this.cols).fill(false));
+                this.flagged = Array(this.rows).fill().map(() => Array(this.cols).fill(false));
+                
+                // 地雷の配置
+                let minesPlaced = 0;
+                while (minesPlaced < this.mineCount) {
+                    const row = Math.floor(Math.random() * this.rows);
+                    const col = Math.floor(Math.random() * this.cols);
+                    if (this.board[row][col] !== -1) {
+                        this.board[row][col] = -1;
+                        minesPlaced++;
+                        // 周囲の数字を更新
+                        for (let dr = -1; dr <= 1; dr++) {
+                            for (let dc = -1; dc <= 1; dc++) {
+                                const nr = row + dr;
+                                const nc = col + dc;
+                                if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols && this.board[nr][nc] !== -1) {
+                                    this.board[nr][nc]++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            reveal(row, col) {
+                if (this.gameOver || this.gameWon || this.revealed[row][col] || this.flagged[row][col]) {
+                    return false;
+                }
+
+                this.revealed[row][col] = true;
+
+                if (this.board[row][col] === -1) {
+                    this.gameOver = true;
+                    return false;
+                }
+
+                // 0の場合は周囲も自動的に開く
+                if (this.board[row][col] === 0) {
+                    for (let dr = -1; dr <= 1; dr++) {
+                        for (let dc = -1; dc <= 1; dc++) {
+                            const nr = row + dr;
+                            const nc = col + dc;
+                            if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols) {
+                                this.reveal(nr, nc);
+                            }
+                        }
+                    }
+                }
+
+                this.checkWin();
+                return true;
+            }
+
+            toggleFlag(row, col) {
+                if (this.gameOver || this.gameWon || this.revealed[row][col]) {
+                    return;
+                }
+                this.flagged[row][col] = !this.flagged[row][col];
+            }
+
+            checkWin() {
+                let revealedCount = 0;
+                for (let row = 0; row < this.rows; row++) {
+                    for (let col = 0; col < this.cols; col++) {
+                        if (this.revealed[row][col]) {
+                            revealedCount++;
+                        }
+                    }
+                }
+                if (revealedCount === this.rows * this.cols - this.mineCount) {
+                    this.gameWon = true;
+                }
+            }
+
+            getFlagCount() {
+                let count = 0;
+                for (let row = 0; row < this.rows; row++) {
+                    for (let col = 0; col < this.cols; col++) {
+                        if (this.flagged[row][col]) count++;
+                    }
+                }
+                return count;
+            }
+        }
+
+        class MinesweeperAI {
+            constructor(game) {
+                this.game = game;
+            }
+
+            makeMove() {
+                // 1. 最初のムーブ：ランダムに安全そうな場所を選ぶ
+                if (this.getRevealedCount() === 0) {
+                    const row = Math.floor(this.game.rows / 2);
+                    const col = Math.floor(this.game.cols / 2);
+                    return { action: 'reveal', row, col };
+                }
+
+                // 2. 確実に地雷がある場所にフラグを立てる
+                const flagMove = this.findDefiniteMine();
+                if (flagMove) {
+                    return { action: 'flag', row: flagMove.row, col: flagMove.col };
+                }
+
+                // 3. 確実に安全な場所を開く
+                const safeMove = this.findSafeCell();
+                if (safeMove) {
+                    return { action: 'reveal', row: safeMove.row, col: safeMove.col };
+                }
+
+                // 4. 確率的に最も安全そうな場所を選ぶ
+                const probabilisticMove = this.findBestProbabilisticMove();
+                if (probabilisticMove) {
+                    return { action: 'reveal', row: probabilisticMove.row, col: probabilisticMove.col };
+                }
+
+                // 5. ランダムに未開示のセルを選ぶ
+                return this.getRandomUnrevealedCell();
+            }
+
+            getRevealedCount() {
+                let count = 0;
+                for (let row = 0; row < this.game.rows; row++) {
+                    for (let col = 0; col < this.game.cols; col++) {
+                        if (this.game.revealed[row][col]) count++;
+                    }
+                }
+                return count;
+            }
+
+            findDefiniteMine() {
+                for (let row = 0; row < this.game.rows; row++) {
+                    for (let col = 0; col < this.game.cols; col++) {
+                        if (this.game.revealed[row][col] && this.game.board[row][col] > 0) {
+                            const neighbors = this.getNeighbors(row, col);
+                            const unrevealed = neighbors.filter(n => !this.game.revealed[n.row][n.col]);
+                            const flagged = neighbors.filter(n => this.game.flagged[n.row][n.col]);
+                            
+                            if (unrevealed.length === this.game.board[row][col] - flagged.length && unrevealed.length > flagged.length) {
+                                const unflagged = unrevealed.filter(n => !this.game.flagged[n.row][n.col]);
+                                if (unflagged.length > 0) {
+                                    return unflagged[0];
+                                }
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            findSafeCell() {
+                for (let row = 0; row < this.game.rows; row++) {
+                    for (let col = 0; col < this.game.cols; col++) {
+                        if (this.game.revealed[row][col] && this.game.board[row][col] > 0) {
+                            const neighbors = this.getNeighbors(row, col);
+                            const flagged = neighbors.filter(n => this.game.flagged[n.row][n.col]);
+                            
+                            if (flagged.length === this.game.board[row][col]) {
+                                const unrevealed = neighbors.filter(n => !this.game.revealed[n.row][n.col] && !this.game.flagged[n.row][n.col]);
+                                if (unrevealed.length > 0) {
+                                    return unrevealed[0];
+                                }
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+
+            findBestProbabilisticMove() {
+                const probabilities = Array(this.game.rows).fill().map(() => Array(this.game.cols).fill(-1));
+                
+                for (let row = 0; row < this.game.rows; row++) {
+                    for (let col = 0; col < this.game.cols; col++) {
+                        if (!this.game.revealed[row][col] && !this.game.flagged[row][col]) {
+                            probabilities[row][col] = this.calculateMineProbability(row, col);
+                        }
+                    }
+                }
+
+                let minProb = 1;
+                let bestMove = null;
+                for (let row = 0; row < this.game.rows; row++) {
+                    for (let col = 0; col < this.game.cols; col++) {
+                        if (probabilities[row][col] >= 0 && probabilities[row][col] < minProb) {
+                            minProb = probabilities[row][col];
+                            bestMove = { row, col };
+                        }
+                    }
+                }
+
+                return bestMove;
+            }
+
+            calculateMineProbability(row, col) {
+                const neighbors = this.getNeighbors(row, col);
+                let maxConstraint = 0;
+                
+                for (const neighbor of neighbors) {
+                    if (this.game.revealed[neighbor.row][neighbor.col] && this.game.board[neighbor.row][neighbor.col] > 0) {
+                        const nNeighbors = this.getNeighbors(neighbor.row, neighbor.col);
+                        const unrevealed = nNeighbors.filter(n => !this.game.revealed[n.row][n.col]);
+                        const flagged = nNeighbors.filter(n => this.game.flagged[n.row][n.col]);
+                        const remainingMines = this.game.board[neighbor.row][neighbor.col] - flagged.length;
+                        const constraint = remainingMines / (unrevealed.length - flagged.length);
+                        maxConstraint = Math.max(maxConstraint, constraint);
+                    }
+                }
+                
+                return maxConstraint;
+            }
+
+            getRandomUnrevealedCell() {
+                const unrevealed = [];
+                for (let row = 0; row < this.game.rows; row++) {
+                    for (let col = 0; col < this.game.cols; col++) {
+                        if (!this.game.revealed[row][col] && !this.game.flagged[row][col]) {
+                            unrevealed.push({ row, col });
+                        }
+                    }
+                }
+                if (unrevealed.length > 0) {
+                    const random = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+                    return { action: 'reveal', row: random.row, col: random.col };
+                }
+                return null;
+            }
+
+            getNeighbors(row, col) {
+                const neighbors = [];
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const nr = row + dr;
+                        const nc = col + dc;
+                        if (nr >= 0 && nr < this.game.rows && nc >= 0 && nc < this.game.cols) {
+                            neighbors.push({ row: nr, col: nc });
+                        }
+                    }
+                }
+                return neighbors;
+            }
+        }
+
+        // UI制御
+        let game = new Minesweeper();
+        let ai = new MinesweeperAI(game);
+        let autoPlayInterval = null;
+
+        function createBoard() {
+            const boardElement = document.getElementById('board');
+            boardElement.innerHTML = '';
+            boardElement.style.gridTemplateColumns = `repeat(${game.cols}, 25px)`;
+
+            for (let row = 0; row < game.rows; row++) {
+                for (let col = 0; col < game.cols; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    cell.addEventListener('click', () => handleCellClick(row, col));
+                    cell.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        handleRightClick(row, col);
+                    });
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+
+        function updateBoard() {
+            for (let row = 0; row < game.rows; row++) {
+                for (let col = 0; col < game.cols; col++) {
+                    const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                    cell.className = 'cell';
+                    
+                    if (game.revealed[row][col]) {
+                        cell.classList.add('revealed');
+                        if (game.board[row][col] === -1) {
+                            cell.classList.add('mine');
+                        } else if (game.board[row][col] > 0) {
+                            cell.textContent = game.board[row][col];
+                            cell.style.color = getNumberColor(game.board[row][col]);
+                        }
+                    } else if (game.flagged[row][col]) {
+                        cell.classList.add('flagged');
+                    }
+                }
+            }
+
+            document.getElementById('flagCount').textContent = game.getFlagCount();
+            
+            if (game.gameOver) {
+                document.getElementById('status').textContent = 'ゲームオーバー';
+                stopAutoPlay();
+            } else if (game.gameWon) {
+                document.getElementById('status').textContent = '勝利！';
+                stopAutoPlay();
+            } else {
+                document.getElementById('status').textContent = 'プレイ中';
+            }
+        }
+
+        function getNumberColor(num) {
+            const colors = ['', '#0000FF', '#008000', '#FF0000', '#000080', '#800000', '#008080', '#000000', '#808080'];
+            return colors[num] || '#000000';
+        }
+
+        function handleCellClick(row, col) {
+            if (!autoPlayInterval) {
+                game.reveal(row, col);
+                updateBoard();
+            }
+        }
+
+        function handleRightClick(row, col) {
+            if (!autoPlayInterval) {
+                game.toggleFlag(row, col);
+                updateBoard();
+            }
+        }
+
+        function newGame() {
+            stopAutoPlay();
+            game = new Minesweeper();
+            ai = new MinesweeperAI(game);
+            createBoard();
+            updateBoard();
+            document.getElementById('status').textContent = '準備完了';
+        }
+
+        function makeAIMove() {
+            if (game.gameOver || game.gameWon) {
+                stopAutoPlay();
+                return;
+            }
+
+            const move = ai.makeMove();
+            if (move) {
+                if (move.action === 'reveal') {
+                    game.reveal(move.row, move.col);
+                } else if (move.action === 'flag') {
+                    if (!game.flagged[move.row][move.col]) {
+                        game.toggleFlag(move.row, move.col);
+                    }
+                }
+                updateBoard();
+            }
+        }
+
+        function startAutoPlay() {
+            if (autoPlayInterval) return;
+            const speed = parseInt(document.getElementById('speed').value);
+            autoPlayInterval = setInterval(makeAIMove, speed);
+            document.getElementById('autoPlay').disabled = true;
+            document.getElementById('stepPlay').disabled = true;
+            document.getElementById('stopAuto').disabled = false;
+        }
+
+        function stopAutoPlay() {
+            if (autoPlayInterval) {
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+            }
+            document.getElementById('autoPlay').disabled = false;
+            document.getElementById('stepPlay').disabled = false;
+            document.getElementById('stopAuto').disabled = true;
+        }
+
+        // イベントリスナー
+        document.getElementById('newGame').addEventListener('click', newGame);
+        document.getElementById('autoPlay').addEventListener('click', startAutoPlay);
+        document.getElementById('stepPlay').addEventListener('click', makeAIMove);
+        document.getElementById('stopAuto').addEventListener('click', stopAutoPlay);
+        
+        document.getElementById('speed').addEventListener('input', (e) => {
+            document.getElementById('speedValue').textContent = e.target.value;
+            if (autoPlayInterval) {
+                stopAutoPlay();
+                startAutoPlay();
+            }
+        });
+
+        // 初期化
+        createBoard();
+        updateBoard();
+        document.getElementById('stopAuto').disabled = true;
+    </script>
+</body>
+</html>

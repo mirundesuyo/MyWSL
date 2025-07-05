@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>すまいる軍から逃げろ！</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #87CEEB;
+            font-family: Arial, sans-serif;
+        }
+        
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+        }
+        
+        #gameInfo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            display: none;
+        }
+        
+        #gameOver h2 {
+            margin: 0 0 10px 0;
+            font-size: 32px;
+        }
+        
+        #gameOver button {
+            padding: 10px 20px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        #gameOver button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="gameInfo">
+        <div>スコア: <span id="score">0</span></div>
+        <div>時間: <span id="time">0</span>秒</div>
+    </div>
+    <div id="gameOver">
+        <h2>ゲームオーバー！</h2>
+        <p>すまいる軍に捕まってしまった！</p>
+        <p>生存時間: <span id="finalTime">0</span>秒</p>
+        <p>最終スコア: <span id="finalScore">0</span></p>
+        <button onclick="resetGame()">もう一度プレイ</button>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // プレイヤー
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 20,
+            speed: 5,
+            color: '#0066FF'
+        };
+        
+        // すまいる軍
+        let smiles = [];
+        const smileEmojis = ['😊', '😄', '😃', '😁', '🙂', '😀'];
+        
+        // ゲーム状態
+        let score = 0;
+        let gameTime = 0;
+        let gameRunning = true;
+        let startTime = Date.now();
+        let lastSpawnTime = 0;
+        let spawnInterval = 2000;
+        
+        // キー入力
+        const keys = {};
+        
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // タッチ操作用
+        let touchX = null;
+        let touchY = null;
+        
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchX = e.touches[0].clientX;
+            touchY = e.touches[0].clientY;
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (touchX !== null && touchY !== null) {
+                const deltaX = e.touches[0].clientX - touchX;
+                const deltaY = e.touches[0].clientY - touchY;
+                player.x += deltaX * 0.5;
+                player.y += deltaY * 0.5;
+                touchX = e.touches[0].clientX;
+                touchY = e.touches[0].clientY;
+            }
+        });
+        
+        canvas.addEventListener('touchend', () => {
+            touchX = null;
+            touchY = null;
+        });
+        
+        // スマイル生成
+        function spawnSmile() {
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+            
+            switch(side) {
+                case 0: // 上
+                    x = Math.random() * canvas.width;
+                    y = -30;
+                    break;
+                case 1: // 右
+                    x = canvas.width + 30;
+                    y = Math.random() * canvas.height;
+                    break;
+                case 2: // 下
+                    x = Math.random() * canvas.width;
+                    y = canvas.height + 30;
+                    break;
+                case 3: // 左
+                    x = -30;
+                    y = Math.random() * canvas.height;
+                    break;
+            }
+            
+            smiles.push({
+                x: x,
+                y: y,
+                size: 30,
+                speed: 1 + Math.random() * 2,
+                emoji: smileEmojis[Math.floor(Math.random() * smileEmojis.length)]
+            });
+        }
+        
+        // プレイヤー更新
+        function updatePlayer() {
+            if (keys['ArrowUp'] || keys['w']) player.y -= player.speed;
+            if (keys['ArrowDown'] || keys['s']) player.y += player.speed;
+            if (keys['ArrowLeft'] || keys['a']) player.x -= player.speed;
+            if (keys['ArrowRight'] || keys['d']) player.x += player.speed;
+            
+            // 画面端の制限
+            player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x));
+            player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y));
+        }
+        
+        // スマイル更新
+        function updateSmiles() {
+            const currentTime = Date.now();
+            
+            // 新しいスマイル生成
+            if (currentTime - lastSpawnTime > spawnInterval) {
+                spawnSmile();
+                lastSpawnTime = currentTime;
+                
+                // 時間経過で難易度上昇
+                if (spawnInterval > 500) {
+                    spawnInterval -= 50;
+                }
+            }
+            
+            // スマイル移動
+            for (let i = smiles.length - 1; i >= 0; i--) {
+                const smile = smiles[i];
+                
+                // プレイヤーを追跡
+                const dx = player.x - smile.x;
+                const dy = player.y - smile.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                smile.x += (dx / distance) * smile.speed;
+                smile.y += (dy / distance) * smile.speed;
+                
+                // 衝突判定
+                if (distance < player.size + smile.size) {
+                    gameRunning = false;
+                    showGameOver();
+                }
+                
+                // 画面外に出たスマイルを削除
+                if (smile.x < -50 || smile.x > canvas.width + 50 ||
+                    smile.y < -50 || smile.y > canvas.height + 50) {
+                    smiles.splice(i, 1);
+                    score += 10;
+                }
+            }
+        }
+        
+        // 描画
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // プレイヤー描画
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // プレイヤーの顔
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.arc(player.x - 7, player.y - 5, 3, 0, Math.PI * 2);
+            ctx.arc(player.x + 7, player.y - 5, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // スマイル描画
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            smiles.forEach(smile => {
+                ctx.fillText(smile.emoji, smile.x, smile.y);
+            });
+        }
+        
+        // ゲーム情報更新
+        function updateGameInfo() {
+            gameTime = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('score').textContent = score;
+            document.getElementById('time').textContent = gameTime;
+        }
+        
+        // ゲームオーバー表示
+        function showGameOver() {
+            document.getElementById('finalTime').textContent = gameTime;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+        
+        // ゲームリセット
+        function resetGame() {
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            smiles = [];
+            score = 0;
+            gameTime = 0;
+            startTime = Date.now();
+            lastSpawnTime = 0;
+            spawnInterval = 2000;
+            gameRunning = true;
+            document.getElementById('gameOver').style.display = 'none';
+        }
+        
+        // ゲームループ
+        function gameLoop() {
+            if (gameRunning) {
+                updatePlayer();
+                updateSmiles();
+                updateGameInfo();
+            }
+            
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // ウィンドウリサイズ対応
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+        
+        // ゲーム開始
+        gameLoop();
+    </script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects - Future Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            font-weight: 100;
+            letter-spacing: 0.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #00ffff, #00ff00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .projects-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+        
+        .project-card {
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            background: rgba(0, 255, 255, 0.05);
+            padding: 2rem;
+            transition: all 0.3s;
+        }
+        
+        .project-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 255, 255, 0.3);
+            border-color: #00ffff;
+        }
+        
+        h2 {
+            color: #00ffff;
+            margin-bottom: 1rem;
+            font-weight: 300;
+        }
+        
+        p {
+            color: #888;
+            line-height: 1.6;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 3rem;
+            padding: 0.8rem 2rem;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .back-link:hover {
+            background: #00ff00;
+            color: #0a0a0a;
+            box-shadow: 0 0 20px #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>PROJECTS</h1>
+    </div>
+    
+    <div class="projects-grid">
+        <div class="project-card">
+            <h2>Neural Interface</h2>
+            <p>Direct brain-computer interaction system for seamless digital experiences.</p>
+        </div>
+        <div class="project-card">
+            <h2>Quantum Computing</h2>
+            <p>Harnessing quantum mechanics for unprecedented computational power.</p>
+        </div>
+        <div class="project-card">
+            <h2>Holographic Display</h2>
+            <p>Three-dimensional projections without the need for special glasses.</p>
+        </div>
+        <div class="project-card">
+            <h2>AI Assistant</h2>
+            <p>Advanced artificial intelligence for personalized digital assistance.</p>
+        </div>
+        <div class="project-card">
+            <h2>Virtual Reality</h2>
+            <p>Immersive digital worlds indistinguishable from reality.</p>
+        </div>
+        <div class="project-card">
+            <h2>Nano Technology</h2>
+            <p>Molecular-scale engineering for revolutionary applications.</p>
+        </div>
+    </div>
+    
+    <center>
+        <a href="index.html" class="back-link">← BACK TO HOME</a>
+    </center>
+</body>
+</html>

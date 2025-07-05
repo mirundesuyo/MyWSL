@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog - Future Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            font-weight: 100;
+            letter-spacing: 0.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #00ff00, #00ffff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .blog-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .blog-post {
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            background: rgba(0, 255, 255, 0.05);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            transition: all 0.3s;
+        }
+        
+        .blog-post:hover {
+            border-color: #00ffff;
+            box-shadow: 0 10px 30px rgba(0, 255, 255, 0.2);
+        }
+        
+        h2 {
+            color: #00ff00;
+            margin-bottom: 0.5rem;
+            font-weight: 300;
+        }
+        
+        .date {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        p {
+            color: #ccc;
+            line-height: 1.6;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-top: 2rem;
+            padding: 0.8rem 2rem;
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .back-link:hover {
+            background: #00ffff;
+            color: #0a0a0a;
+            box-shadow: 0 0 20px #00ffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>BLOG</h1>
+    </div>
+    
+    <div class="blog-container">
+        <article class="blog-post">
+            <h2>The Future of Web Design</h2>
+            <div class="date">2025.01.15</div>
+            <p>Exploring the convergence of AI, VR, and quantum computing in creating tomorrow's digital experiences.</p>
+        </article>
+        
+        <article class="blog-post">
+            <h2>Neural Networks and Creativity</h2>
+            <div class="date">2025.01.10</div>
+            <p>How artificial intelligence is revolutionizing the creative process and opening new possibilities.</p>
+        </article>
+        
+        <article class="blog-post">
+            <h2>Building the Metaverse</h2>
+            <div class="date">2025.01.05</div>
+            <p>Technical challenges and breakthroughs in creating persistent, shared virtual worlds.</p>
+        </article>
+        
+        <article class="blog-post">
+            <h2>Quantum Computing Basics</h2>
+            <div class="date">2024.12.28</div>
+            <p>Understanding the fundamentals of quantum mechanics in computational systems.</p>
+        </article>
+    </div>
+    
+    <center>
+        <a href="index.html" class="back-link">← BACK TO HOME</a>
+    </center>
+</body>
+</html>

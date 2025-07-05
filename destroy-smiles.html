@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スマイル破壊ゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #111;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+        
+        .container {
+            text-align: center;
+            position: relative;
+            height: 100vh;
+        }
+        
+        h1 {
+            color: #ff3333;
+            text-shadow: 2px 2px 4px rgba(255,0,0,0.5);
+            margin-bottom: 30px;
+        }
+        
+        .score {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #ffaa00;
+        }
+        
+        .smile {
+            position: absolute;
+            font-size: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .smile:hover {
+            transform: scale(1.2);
+        }
+        
+        .destroying {
+            animation: destroy 0.5s ease-out forwards;
+        }
+        
+        @keyframes destroy {
+            0% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.5) rotate(180deg);
+                filter: hue-rotate(180deg);
+            }
+            100% {
+                transform: scale(0) rotate(360deg);
+                opacity: 0;
+                filter: hue-rotate(360deg) blur(10px);
+            }
+        }
+        
+        .explosion {
+            position: absolute;
+            pointer-events: none;
+            width: 100px;
+            height: 100px;
+            transform: translate(-50%, -50%);
+        }
+        
+        .particle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #ff0000;
+            border-radius: 50%;
+            animation: explode 0.6s ease-out forwards;
+        }
+        
+        @keyframes explode {
+            to {
+                transform: translate(var(--x), var(--y)) scale(0);
+                opacity: 0;
+            }
+        }
+        
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            border: 3px solid #ff0000;
+        }
+        
+        .game-over h2 {
+            color: #ff3333;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 30px;
+            font-size: 18px;
+            background: #ff3333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #ff5555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>😊 スマイル破壊ゲーム 😊</h1>
+        <div class="score">破壊したスマイル: <span id="score">0</span></div>
+        <div id="game-area"></div>
+        
+        <div class="game-over" id="game-over">
+            <h2>ゲームオーバー！</h2>
+            <p>最終スコア: <span id="final-score">0</span></p>
+            <button onclick="restartGame()">もう一度プレイ</button>
+        </div>
+    </div>
+
+    <script>
+        let score = 0;
+        let gameActive = true;
+        const smiles = ['😊', '😄', '😃', '😁', '🙂', '😆', '😀', '🤗', '😉', '😋'];
+        const maxSmiles = 20;
+        let currentSmiles = 0;
+        
+        function createSmile() {
+            if (!gameActive || currentSmiles >= maxSmiles) return;
+            
+            const smile = document.createElement('div');
+            smile.className = 'smile';
+            smile.textContent = smiles[Math.floor(Math.random() * smiles.length)];
+            
+            const gameArea = document.getElementById('game-area');
+            const x = Math.random() * (window.innerWidth - 100);
+            const y = Math.random() * (window.innerHeight - 200) + 100;
+            
+            smile.style.left = x + 'px';
+            smile.style.top = y + 'px';
+            smile.style.animationDelay = Math.random() * 2 + 's';
+            
+            smile.addEventListener('click', function(e) {
+                destroySmile(this, e);
+            });
+            
+            gameArea.appendChild(smile);
+            currentSmiles++;
+            
+            // スマイルが自然に消える
+            setTimeout(() => {
+                if (smile.parentNode && !smile.classList.contains('destroying')) {
+                    smile.remove();
+                    currentSmiles--;
+                    
+                    // ゲームオーバーチェック
+                    if (currentSmiles === 0 && score < 50) {
+                        endGame();
+                    }
+                }
+            }, 5000 + Math.random() * 5000);
+        }
+        
+        function destroySmile(smile, event) {
+            if (smile.classList.contains('destroying')) return;
+            
+            smile.classList.add('destroying');
+            score++;
+            document.getElementById('score').textContent = score;
+            
+            // 爆発エフェクト
+            createExplosion(event.pageX, event.pageY);
+            
+            // サウンドエフェクト（ビジュアルのみ）
+            document.body.style.background = '#330000';
+            setTimeout(() => {
+                document.body.style.background = '#111';
+            }, 100);
+            
+            setTimeout(() => {
+                smile.remove();
+                currentSmiles--;
+            }, 500);
+            
+            // 勝利条件
+            if (score >= 50) {
+                endGame(true);
+            }
+        }
+        
+        function createExplosion(x, y) {
+            const explosion = document.createElement('div');
+            explosion.className = 'explosion';
+            explosion.style.left = x + 'px';
+            explosion.style.top = y + 'px';
+            
+            for (let i = 0; i < 10; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                const angle = (Math.PI * 2 * i) / 10;
+                const distance = 50 + Math.random() * 50;
+                const xOffset = Math.cos(angle) * distance;
+                const yOffset = Math.sin(angle) * distance;
+                
+                particle.style.setProperty('--x', xOffset + 'px');
+                particle.style.setProperty('--y', yOffset + 'px');
+                particle.style.background = `hsl(${Math.random() * 60}, 100%, 50%)`;
+                
+                explosion.appendChild(particle);
+            }
+            
+            document.body.appendChild(explosion);
+            
+            setTimeout(() => {
+                explosion.remove();
+            }, 600);
+        }
+        
+        function endGame(victory = false) {
+            gameActive = false;
+            const gameOver = document.getElementById('game-over');
+            const h2 = gameOver.querySelector('h2');
+            
+            if (victory) {
+                h2.textContent = '勝利！全てのスマイルを破壊した！';
+                h2.style.color = '#00ff00';
+            } else {
+                h2.textContent = 'ゲームオーバー！';
+                h2.style.color = '#ff3333';
+            }
+            
+            document.getElementById('final-score').textContent = score;
+            gameOver.style.display = 'block';
+        }
+        
+        function restartGame() {
+            score = 0;
+            currentSmiles = 0;
+            gameActive = true;
+            document.getElementById('score').textContent = score;
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('game-area').innerHTML = '';
+            startGame();
+        }
+        
+        function startGame() {
+            // スマイルを定期的に生成
+            setInterval(() => {
+                if (gameActive) {
+                    createSmile();
+                }
+            }, 1000);
+            
+            // 初期スマイル
+            for (let i = 0; i < 5; i++) {
+                setTimeout(() => createSmile(), i * 200);
+            }
+        }
+        
+        // ゲーム開始
+        startGame();
+    </script>
+</body>
+</html>

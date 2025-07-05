@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate 3D 物理演算投げゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background: #000;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #00ff00;
+            min-width: 200px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #00ff00;
+        }
+        #gameMode {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid #ff00ff;
+        }
+        .button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .button:hover {
+            background: #45a049;
+        }
+        #powerBar {
+            width: 200px;
+            height: 20px;
+            background: #333;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        #powerFill {
+            height: 100%;
+            background: linear-gradient(to right, #00ff00, #ffff00, #ff0000);
+            width: 0%;
+            transition: width 0.1s;
+        }
+        #combo {
+            font-size: 24px;
+            color: #ffff00;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        #timer {
+            font-size: 20px;
+            color: #ff6666;
+            font-weight: bold;
+        }
+        .powerup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            color: #ffff00;
+            font-weight: bold;
+            text-shadow: 2px 2px 8px rgba(255,255,0,0.8);
+            animation: powerupPulse 1s ease-out;
+            pointer-events: none;
+        }
+        @keyframes powerupPulse {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.5); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+        }
+        #achievements {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 2px solid gold;
+            display: none;
+            animation: achievementShow 3s ease-out;
+        }
+        @keyframes achievementShow {
+            0% { transform: translateX(-50%) translateY(-100px); }
+            20% { transform: translateX(-50%) translateY(0); }
+            80% { transform: translateX(-50%) translateY(0); opacity: 1; }
+            100% { transform: translateX(-50%) translateY(0); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>Ultimate 物理演算投げゲーム</h3>
+        <p>スコア: <span id="score">0</span></p>
+        <p>ハイスコア: <span id="highScore">0</span></p>
+        <p id="combo">コンボ: x<span id="comboCount">1</span></p>
+        <p id="timer" style="display: none;">残り時間: <span id="timeLeft">60</span>秒</p>
+        <p>ボール: <span id="ballsLeft">∞</span></p>
+        <p>パワー:</p>
+        <div id="powerBar">
+            <div id="powerFill"></div>
+        </div>
+    </div>
+    
+    <div id="gameMode">
+        <h3>ゲームモード</h3>
+        <button class="button" onclick="setGameMode('arcade')">アーケード</button>
+        <button class="button" onclick="setGameMode('timeAttack')">タイムアタック</button>
+        <button class="button" onclick="setGameMode('precision')">精密射撃</button>
+        <button class="button" onclick="setGameMode('endless')">エンドレス</button>
+    </div>
+    
+    <div id="controls">
+        <p>🎯 マウスドラッグ: 狙いを定める</p>
+        <p>⚡ 長押し: パワー調整</p>
+        <p>🔄 Rキー: リセット</p>
+        <p>🎨 1-5キー: ボールタイプ変更</p>
+    </div>
+    
+    <div id="achievements"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <script>
+        // ゲーム設定
+        let gameMode = 'arcade';
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        let combo = 1;
+        let lastHitTime = 0;
+        let timeLeft = 60;
+        let ballsLeft = Infinity;
+        let gameActive = true;
+        let selectedBallType = 'normal';
+        
+        // ボールタイプ定義
+        const ballTypes = {
+            normal: { color: 0xffffff, mass: 1, radius: 0.5, special: 'none' },
+            heavy: { color: 0x666666, mass: 3, radius: 0.6, special: 'piercing' },
+            explosive: { color: 0xff0000, mass: 0.8, radius: 0.4, special: 'explosive' },
+            bouncy: { color: 0x00ff00, mass: 0.5, radius: 0.5, special: 'bouncy' },
+            multi: { color: 0xff00ff, mass: 0.7, radius: 0.4, special: 'multi' }
+        };
+
+        // シーンの初期化
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000033);
+        scene.fog = new THREE.Fog(0x000033, 0, 500);
+
+        // カメラの設定
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 8, 15);
+        camera.lookAt(0, 0, -5);
+
+        // レンダラーの設定
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // 照明の追加
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(10, 30, 10);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.camera.near = 0.1;
+        directionalLight.shadow.camera.far = 100;
+        directionalLight.shadow.camera.left = -30;
+        directionalLight.shadow.camera.right = 30;
+        directionalLight.shadow.camera.top = 30;
+        directionalLight.shadow.camera.bottom = -30;
+        scene.add(directionalLight);
+
+        // スポットライト（ドラマチック効果）
+        const spotLight = new THREE.SpotLight(0xff00ff, 0.5);
+        spotLight.position.set(0, 20, 0);
+        spotLight.angle = Math.PI / 4;
+        spotLight.penumbra = 0.5;
+        scene.add(spotLight);
+
+        // 物理エンジンの初期化
+        const world = new CANNON.World();
+        world.gravity.set(0, -9.82, 0);
+        world.broadphase = new CANNON.NaiveBroadphase();
+        world.solver.iterations = 10;
+
+        // 地面の作成
+        const groundGeometry = new THREE.PlaneGeometry(200, 200);
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x1a1a2e,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+        groundMesh.rotation.x = -Math.PI / 2;
+        groundMesh.receiveShadow = true;
+        scene.add(groundMesh);
+
+        const groundShape = new CANNON.Plane();
+        const groundBody = new CANNON.Body({ mass: 0 });
+        groundBody.addShape(groundShape);
+        groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        world.add(groundBody);
+
+        // パーティクルシステム
+        const particles = [];
+        function createParticles(position, color, count = 20) {
+            const particleGeometry = new THREE.SphereGeometry(0.1, 4, 4);
+            const particleMaterial = new THREE.MeshBasicMaterial({ color: color });
+            
+            for (let i = 0; i < count; i++) {
+                const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+                particle.position.copy(position);
+                particle.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 10,
+                    Math.random() * 10,
+                    (Math.random() - 0.5) * 10
+                );
+                particle.lifetime = 1;
+                scene.add(particle);
+                particles.push(particle);
+            }
+        }
+
+        // ターゲットシステム
+        const targets = [];
+        const targetBodies = [];
+        const targetTypes = {
+            normal: { points: 100, color: 0xff0000, size: 2 },
+            gold: { points: 500, color: 0xffd700, size: 1.5 },
+            moving: { points: 300, color: 0x00ffff, size: 2 },
+            tiny: { points: 1000, color: 0xff00ff, size: 0.8 }
+        };
+
+        function createTarget(type, position) {
+            const targetType = targetTypes[type];
+            const geometry = type === 'tiny' ? 
+                new THREE.SphereGeometry(targetType.size, 16, 16) :
+                new THREE.BoxGeometry(targetType.size, targetType.size, targetType.size);
+            
+            const material = new THREE.MeshStandardMaterial({ 
+                color: targetType.color,
+                metalness: 0.5,
+                roughness: 0.3,
+                emissive: targetType.color,
+                emissiveIntensity: 0.2
+            });
+            
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.copy(position);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.userData = { type: type, points: targetType.points };
+            scene.add(mesh);
+            targets.push(mesh);
+
+            const shape = type === 'tiny' ?
+                new CANNON.Sphere(targetType.size) :
+                new CANNON.Box(new CANNON.Vec3(targetType.size/2, targetType.size/2, targetType.size/2));
+            
+            const body = new CANNON.Body({
+                mass: type === 'moving' ? 0 : 2,
+                shape: shape,
+                position: new CANNON.Vec3(position.x, position.y, position.z)
+            });
+            world.add(body);
+            targetBodies.push(body);
+            
+            if (type === 'moving') {
+                mesh.userData.movingData = {
+                    center: position.x,
+                    range: 10,
+                    speed: 2
+                };
+            }
+            
+            return { mesh, body };
+        }
+
+        // 障害物の作成
+        const obstacles = [];
+        const obstacleBodies = [];
+        
+        function createObstacle(position, size) {
+            const geometry = new THREE.BoxGeometry(size.x, size.y, size.z);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0x4a4a4a,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.copy(position);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            obstacles.push(mesh);
+
+            const shape = new CANNON.Box(new CANNON.Vec3(size.x/2, size.y/2, size.z/2));
+            const body = new CANNON.Body({
+                mass: 0,
+                shape: shape,
+                position: new CANNON.Vec3(position.x, position.y, position.z)
+            });
+            world.add(body);
+            obstacleBodies.push(body);
+        }
+
+        // レベル生成
+        function generateLevel() {
+            // ターゲットとボディをクリア
+            targets.forEach(target => scene.remove(target));
+            targetBodies.forEach(body => world.remove(body));
+            targets.length = 0;
+            targetBodies.length = 0;
+            
+            obstacles.forEach(obstacle => scene.remove(obstacle));
+            obstacleBodies.forEach(body => world.remove(body));
+            obstacles.length = 0;
+            obstacleBodies.length = 0;
+
+            // ゲームモードに応じたレベル生成
+            switch(gameMode) {
+                case 'arcade':
+                    // 通常ターゲット
+                    for (let i = 0; i < 5; i++) {
+                        createTarget('normal', new THREE.Vector3(
+                            (i - 2) * 5,
+                            1,
+                            -25 - Math.random() * 15
+                        ));
+                    }
+                    // ゴールドターゲット
+                    createTarget('gold', new THREE.Vector3(0, 3, -35));
+                    // 動くターゲット
+                    createTarget('moving', new THREE.Vector3(10, 2, -20));
+                    createTarget('moving', new THREE.Vector3(-10, 2, -20));
+                    break;
+                    
+                case 'timeAttack':
+                    for (let i = 0; i < 10; i++) {
+                        const type = Math.random() > 0.7 ? 'gold' : 'normal';
+                        createTarget(type, new THREE.Vector3(
+                            (Math.random() - 0.5) * 30,
+                            1 + Math.random() * 3,
+                            -20 - Math.random() * 20
+                        ));
+                    }
+                    break;
+                    
+                case 'precision':
+                    // 小さいターゲット
+                    for (let i = 0; i < 3; i++) {
+                        createTarget('tiny', new THREE.Vector3(
+                            (i - 1) * 8,
+                            2,
+                            -30
+                        ));
+                    }
+                    // 障害物
+                    createObstacle(new THREE.Vector3(0, 3, -20), new THREE.Vector3(15, 0.5, 2));
+                    createObstacle(new THREE.Vector3(8, 2, -25), new THREE.Vector3(0.5, 4, 2));
+                    createObstacle(new THREE.Vector3(-8, 2, -25), new THREE.Vector3(0.5, 4, 2));
+                    break;
+                    
+                case 'endless':
+                    // ランダム配置
+                    for (let i = 0; i < 8; i++) {
+                        const types = ['normal', 'gold', 'moving', 'tiny'];
+                        const type = types[Math.floor(Math.random() * types.length)];
+                        createTarget(type, new THREE.Vector3(
+                            (Math.random() - 0.5) * 40,
+                            1 + Math.random() * 4,
+                            -20 - Math.random() * 25
+                        ));
+                    }
+                    // ランダム障害物
+                    for (let i = 0; i < 3; i++) {
+                        createObstacle(
+                            new THREE.Vector3(
+                                (Math.random() - 0.5) * 30,
+                                2,
+                                -15 - Math.random() * 15
+                            ),
+                            new THREE.Vector3(
+                                1 + Math.random() * 3,
+                                1 + Math.random() * 3,
+                                1 + Math.random() * 3
+                            )
+                        );
+                    }
+                    break;
+            }
+        }
+
+        // ボール管理
+        const balls = [];
+        const ballBodies = [];
+
+        // 投げる処理
+        let power = 0;
+        let isCharging = false;
+        let mouseDownTime = 0;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+
+        renderer.domElement.addEventListener('mousedown', (e) => {
+            if (!gameActive) return;
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            mouseDownTime = Date.now();
+            isCharging = true;
+        });
+
+        renderer.domElement.addEventListener('mouseup', (e) => {
+            if (!gameActive || !isDragging) return;
+            throwBall(e);
+            isDragging = false;
+            isCharging = false;
+            power = 0;
+            updatePowerBar();
+        });
+
+        function throwBall(e) {
+            if (gameMode === 'precision' && ballsLeft <= 0) return;
+            
+            const ballType = ballTypes[selectedBallType];
+            const ballGeometry = new THREE.SphereGeometry(ballType.radius, 16, 16);
+            const ballMaterial = new THREE.MeshStandardMaterial({ 
+                color: ballType.color,
+                metalness: 0.4,
+                roughness: 0.6,
+                emissive: ballType.color,
+                emissiveIntensity: 0.3
+            });
+            const ballMesh = new THREE.Mesh(ballGeometry, ballMaterial);
+            ballMesh.castShadow = true;
+            ballMesh.position.set(0, 5, 10);
+            ballMesh.userData = { type: selectedBallType };
+            scene.add(ballMesh);
+            balls.push(ballMesh);
+
+            const ballShape = new CANNON.Sphere(ballType.radius);
+            const ballBody = new CANNON.Body({
+                mass: ballType.mass,
+                shape: ballShape,
+                position: new CANNON.Vec3(0, 5, 10)
+            });
+
+            // 投げる力の計算
+            const dx = (e.clientX - dragStartX) / window.innerWidth;
+            const dy = (dragStartY - e.clientY) / window.innerHeight;
+            const chargeTime = Math.min((Date.now() - mouseDownTime) / 1000, 2);
+            const forceMagnitude = 15 + chargeTime * 25;
+
+            const forceX = -dx * forceMagnitude * 2;
+            const forceY = dy * forceMagnitude + 8;
+            const forceZ = -forceMagnitude;
+
+            ballBody.velocity.set(forceX, forceY, forceZ);
+            
+            // 特殊効果
+            if (ballType.special === 'bouncy') {
+                ballBody.material = new CANNON.Material({ restitution: 0.9 });
+            }
+            
+            world.add(ballBody);
+            ballBodies.push(ballBody);
+
+            // マルチショット
+            if (ballType.special === 'multi') {
+                setTimeout(() => {
+                    for (let i = 0; i < 2; i++) {
+                        const extraBall = ballMesh.clone();
+                        extraBall.position.copy(ballMesh.position);
+                        scene.add(extraBall);
+                        balls.push(extraBall);
+                        
+                        const extraBody = new CANNON.Body({
+                            mass: ballType.mass,
+                            shape: ballShape,
+                            position: new CANNON.Vec3(
+                                ballBody.position.x,
+                                ballBody.position.y,
+                                ballBody.position.z
+                            )
+                        });
+                        extraBody.velocity.set(
+                            forceX + (i - 0.5) * 5,
+                            forceY,
+                            forceZ
+                        );
+                        world.add(extraBody);
+                        ballBodies.push(extraBody);
+                    }
+                }, 100);
+            }
+
+            // ボール数管理
+            if (gameMode === 'precision') {
+                ballsLeft--;
+                updateUI();
+            }
+
+            // 古いボールを削除
+            if (balls.length > 15) {
+                const oldBall = balls.shift();
+                const oldBody = ballBodies.shift();
+                scene.remove(oldBall);
+                world.remove(oldBody);
+            }
+        }
+
+        // パワーアップ表示
+        function showPowerUp(text) {
+            const powerupDiv = document.createElement('div');
+            powerupDiv.className = 'powerup';
+            powerupDiv.textContent = text;
+            document.body.appendChild(powerupDiv);
+            setTimeout(() => powerupDiv.remove(), 1000);
+        }
+
+        // 実績表示
+        function showAchievement(text) {
+            const achievementDiv = document.getElementById('achievements');
+            achievementDiv.textContent = '🏆 ' + text;
+            achievementDiv.style.display = 'block';
+            setTimeout(() => {
+                achievementDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        // 衝突処理
+        world.addEventListener('beginContact', (event) => {
+            const bodyA = event.bodyA;
+            const bodyB = event.bodyB;
+            
+            for (let i = 0; i < ballBodies.length; i++) {
+                for (let j = 0; j < targetBodies.length; j++) {
+                    if ((bodyA === ballBodies[i] && bodyB === targetBodies[j]) ||
+                        (bodyB === ballBodies[i] && bodyA === targetBodies[j])) {
+                        
+                        const ball = balls[i];
+                        const target = targets[j];
+                        const targetData = target.userData;
+                        
+                        // コンボ計算
+                        const now = Date.now();
+                        if (now - lastHitTime < 2000) {
+                            combo++;
+                            if (combo % 5 === 0) {
+                                showAchievement(`${combo}コンボ達成！`);
+                            }
+                        } else {
+                            combo = 1;
+                        }
+                        lastHitTime = now;
+                        
+                        // スコア計算
+                        const points = targetData.points * combo;
+                        score += points;
+                        
+                        // エフェクト
+                        createParticles(target.position, targetTypes[targetData.type].color);
+                        
+                        // 爆発効果
+                        if (ball.userData.type === 'explosive') {
+                            const explosionRadius = 5;
+                            for (let k = 0; k < targetBodies.length; k++) {
+                                if (k !== j) {
+                                    const distance = targetBodies[k].position.distanceTo(targetBodies[j].position);
+                                    if (distance < explosionRadius) {
+                                        const force = new CANNON.Vec3(
+                                            targetBodies[k].position.x - targetBodies[j].position.x,
+                                            10,
+                                            targetBodies[k].position.z - targetBodies[j].position.z
+                                        );
+                                        force.normalize();
+                                        force.scale(100, force);
+                                        targetBodies[k].applyImpulse(force, targetBodies[k].position);
+                                    }
+                                }
+                            }
+                            showPowerUp('💥 EXPLOSION!');
+                        }
+                        
+                        updateUI();
+                    }
+                }
+            }
+        });
+
+        // ゲームモード設定
+        function setGameMode(mode) {
+            gameMode = mode;
+            score = 0;
+            combo = 1;
+            timeLeft = 60;
+            ballsLeft = mode === 'precision' ? 10 : Infinity;
+            gameActive = true;
+            generateLevel();
+            updateUI();
+            
+            if (mode === 'timeAttack') {
+                startTimer();
+            }
+        }
+
+        // タイマー
+        let timerInterval;
+        function startTimer() {
+            clearInterval(timerInterval);
+            document.getElementById('timer').style.display = 'block';
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timeLeft').textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    gameActive = false;
+                    showAchievement(`タイムアップ！最終スコア: ${score}`);
+                }
+            }, 1000);
+        }
+
+        // UI更新
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('highScore').textContent = highScore;
+            document.getElementById('comboCount').textContent = combo;
+            document.getElementById('ballsLeft').textContent = 
+                ballsLeft === Infinity ? '∞' : ballsLeft;
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore);
+            }
+        }
+
+        function updatePowerBar() {
+            if (isCharging) {
+                const chargeTime = Math.min((Date.now() - mouseDownTime) / 1000, 2);
+                power = (chargeTime / 2) * 100;
+                document.getElementById('powerFill').style.width = power + '%';
+            } else {
+                document.getElementById('powerFill').style.width = '0%';
+            }
+        }
+
+        // キーボード入力
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                setGameMode(gameMode);
+            }
+            
+            // ボールタイプ選択
+            const ballTypeKeys = {
+                '1': 'normal',
+                '2': 'heavy',
+                '3': 'explosive',
+                '4': 'bouncy',
+                '5': 'multi'
+            };
+            if (ballTypeKeys[e.key]) {
+                selectedBallType = ballTypeKeys[e.key];
+                showPowerUp(`${selectedBallType.toUpperCase()} BALL!`);
+            }
+        });
+
+        // ウィンドウリサイズ
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // アニメーションループ
+        const clock = new THREE.Clock();
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const deltaTime = clock.getDelta();
+            const elapsedTime = clock.getElapsedTime();
+            world.step(deltaTime);
+
+            // 物理更新
+            for (let i = 0; i < balls.length; i++) {
+                balls[i].position.copy(ballBodies[i].position);
+                balls[i].quaternion.copy(ballBodies[i].quaternion);
+            }
+
+            for (let i = 0; i < targets.length; i++) {
+                targets[i].position.copy(targetBodies[i].position);
+                targets[i].quaternion.copy(targetBodies[i].quaternion);
+                
+                // 動くターゲットの更新
+                if (targets[i].userData.movingData) {
+                    const data = targets[i].userData.movingData;
+                    const newX = data.center + Math.sin(elapsedTime * data.speed) * data.range;
+                    targetBodies[i].position.x = newX;
+                    targets[i].position.x = newX;
+                }
+            }
+
+            // パーティクル更新
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                particle.lifetime -= deltaTime;
+                if (particle.lifetime <= 0) {
+                    scene.remove(particle);
+                    particles.splice(i, 1);
+                } else {
+                    particle.position.add(particle.velocity.clone().multiplyScalar(deltaTime));
+                    particle.velocity.y -= 10 * deltaTime;
+                    particle.material.opacity = particle.lifetime;
+                }
+            }
+
+            // スポットライト回転
+            spotLight.position.x = Math.sin(elapsedTime * 0.5) * 20;
+            spotLight.position.z = Math.cos(elapsedTime * 0.5) * 20;
+
+            updatePowerBar();
+            renderer.render(scene, camera);
+        }
+
+        // 初期化
+        generateLevel();
+        updateUI();
+        animate();
+    </script>
+</body>
+</html>

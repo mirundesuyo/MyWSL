@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI音楽ジェネレーター</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        label {
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+            font-size: 1em;
+        }
+
+        select {
+            cursor: pointer;
+        }
+
+        select option {
+            background: #667eea;
+            color: #fff;
+        }
+
+        input[type="range"] {
+            cursor: pointer;
+            height: 8px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .tempo-display {
+            text-align: center;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        #generateBtn {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            color: #fff;
+        }
+
+        #generateBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+        }
+
+        #playBtn, #stopBtn {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+
+        #playBtn:hover, #stopBtn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        #playBtn:disabled, #stopBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .visualizer {
+            margin-top: 30px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .bar {
+            width: 10px;
+            background: linear-gradient(to top, #f093fb, #f5576c);
+            border-radius: 5px 5px 0 0;
+            transition: height 0.1s ease;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 1.1em;
+            min-height: 30px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .generating {
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 AI音楽ジェネレーター</h1>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="genre">ジャンル</label>
+                <select id="genre">
+                    <option value="ambient">アンビエント</option>
+                    <option value="electronic">エレクトロニック</option>
+                    <option value="jazz">ジャズ</option>
+                    <option value="classical">クラシック</option>
+                    <option value="pop">ポップ</option>
+                    <option value="rock">ロック</option>
+                    <option value="hiphop">ヒップホップ</option>
+                    <option value="reggae">レゲエ</option>
+                    <option value="funk">ファンク</option>
+                    <option value="disco">ディスコ</option>
+                    <option value="techno">テクノ</option>
+                    <option value="house">ハウス</option>
+                    <option value="dnb">ドラムンベース</option>
+                    <option value="dubstep">ダブステップ</option>
+                    <option value="trap">トラップ</option>
+                    <option value="latin">ラテン</option>
+                    <option value="country">カントリー</option>
+                    <option value="blues">ブルース</option>
+                    <option value="metal">メタル</option>
+                    <option value="folk">フォーク</option>
+                    <option value="soul">ソウル</option>
+                    <option value="rnb">R&B</option>
+                    <option value="cinematic">シネマティック</option>
+                    <option value="8bit">8ビット</option>
+                    <option value="lofi">Lo-Fi</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="mood">ムード</label>
+                <select id="mood">
+                    <option value="happy">明るい</option>
+                    <option value="sad">悲しい</option>
+                    <option value="energetic">エネルギッシュ</option>
+                    <option value="calm">穏やか</option>
+                    <option value="mysterious">神秘的</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="tempo">テンポ: <span id="tempoValue">120</span> BPM</label>
+                <input type="range" id="tempo" min="60" max="180" value="120">
+                <div class="tempo-display">スロー ← → ファスト</div>
+            </div>
+
+            <div class="control-group">
+                <label for="duration">長さ</label>
+                <select id="duration">
+                    <option value="15">15秒</option>
+                    <option value="30">30秒</option>
+                    <option value="60">1分</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="generateBtn">生成</button>
+            <button id="playBtn" disabled>再生</button>
+            <button id="stopBtn" disabled>停止</button>
+        </div>
+
+        <div class="visualizer" id="visualizer">
+            <div class="bar" style="height: 20%"></div>
+            <div class="bar" style="height: 40%"></div>
+            <div class="bar" style="height: 60%"></div>
+            <div class="bar" style="height: 30%"></div>
+            <div class="bar" style="height: 80%"></div>
+            <div class="bar" style="height: 50%"></div>
+            <div class="bar" style="height: 70%"></div>
+            <div class="bar" style="height: 40%"></div>
+            <div class="bar" style="height: 60%"></div>
+            <div class="bar" style="height: 30%"></div>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        // Web Audio API context
+        let audioContext;
+        let currentSource;
+        let isPlaying = false;
+        let generatedMusic = null;
+
+        // UI elements
+        const generateBtn = document.getElementById('generateBtn');
+        const playBtn = document.getElementById('playBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const tempoSlider = document.getElementById('tempo');
+        const tempoValue = document.getElementById('tempoValue');
+        const status = document.getElementById('status');
+        const visualizerBars = document.querySelectorAll('.bar');
+
+        // Initialize audio context
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Update tempo display
+        tempoSlider.addEventListener('input', (e) => {
+            tempoValue.textContent = e.target.value;
+        });
+
+        // Music generation parameters
+        const scales = {
+            major: [0, 2, 4, 5, 7, 9, 11],
+            minor: [0, 2, 3, 5, 7, 8, 10],
+            pentatonic: [0, 2, 4, 7, 9],
+            blues: [0, 3, 5, 6, 7, 10],
+            dorian: [0, 2, 3, 5, 7, 9, 10],
+            phrygian: [0, 1, 3, 5, 7, 8, 10],
+            lydian: [0, 2, 4, 6, 7, 9, 11],
+            mixolydian: [0, 2, 4, 5, 7, 9, 10],
+            locrian: [0, 1, 3, 5, 6, 8, 10],
+            harmonic_minor: [0, 2, 3, 5, 7, 8, 11],
+            chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+            whole_tone: [0, 2, 4, 6, 8, 10],
+            japanese: [0, 1, 5, 7, 8]
+        };
+
+        const chordProgressions = {
+            pop: [[0, 4, 7], [5, 9, 12], [2, 5, 9], [7, 11, 14]],
+            jazz: [[0, 4, 7, 11], [2, 5, 9, 12], [5, 9, 12, 16], [0, 4, 7, 10]],
+            classical: [[0, 4, 7], [5, 9, 12], [0, 4, 7], [2, 5, 9]]
+        };
+
+        // Generate music based on parameters
+        function generateMusic() {
+            const genre = document.getElementById('genre').value;
+            const mood = document.getElementById('mood').value;
+            const tempo = parseInt(document.getElementById('tempo').value);
+            const duration = parseInt(document.getElementById('duration').value);
+
+            status.textContent = '音楽を生成中...';
+            status.classList.add('generating');
+            generateBtn.disabled = true;
+
+            // Simulate AI generation with procedural music
+            setTimeout(() => {
+                initAudioContext();
+
+                // Calculate music parameters
+                const sampleRate = audioContext.sampleRate;
+                const bufferSize = sampleRate * duration;
+                const buffer = audioContext.createBuffer(2, bufferSize, sampleRate);
+
+                // Choose scale based on genre and mood
+                let scale;
+                switch (genre) {
+                    case 'jazz': scale = scales.dorian; break;
+                    case 'blues': scale = scales.blues; break;
+                    case 'metal': scale = scales.phrygian; break;
+                    case 'latin': scale = scales.harmonic_minor; break;
+                    case 'japanese': case 'lofi': scale = scales.japanese; break;
+                    case 'dnb': case 'dubstep': scale = scales.minor; break;
+                    case 'funk': case 'disco': scale = scales.mixolydian; break;
+                    case 'folk': case 'country': scale = scales.major; break;
+                    default: scale = mood === 'happy' || mood === 'energetic' ? scales.major : scales.minor;
+                }
+                
+                const baseFreq = mood === 'calm' || mood === 'sad' ? 220 : 
+                               genre === 'dnb' || genre === 'dubstep' ? 110 : 
+                               genre === 'metal' ? 82.41 : 440;
+
+                // Generate music data
+                for (let channel = 0; channel < 2; channel++) {
+                    const channelData = buffer.getChannelData(channel);
+                    
+                    for (let i = 0; i < bufferSize; i++) {
+                        const time = i / sampleRate;
+                        const beat = (time * tempo / 60) % 1;
+                        
+                        // Generate melody
+                        const noteIndex = Math.floor(time * 2) % scale.length;
+                        const frequency = baseFreq * Math.pow(2, scale[noteIndex] / 12);
+                        
+                        // Generate waveform based on genre
+                        let wave = 0;
+                        
+                        switch (genre) {
+                            case 'electronic':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.3;
+                                wave += Math.sin(2 * Math.PI * frequency * 2 * time) * 0.1;
+                                if (beat < 0.1) wave += Math.random() * 0.2;
+                                break;
+                            
+                            case 'ambient':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.2;
+                                wave *= Math.sin(time * 0.5) * 0.5 + 0.5;
+                                break;
+                            
+                            case 'jazz':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.25;
+                                wave += Math.sin(2 * Math.PI * frequency * 1.5 * time) * 0.1;
+                                wave += Math.sin(2 * Math.PI * frequency * 2 * time) * 0.05;
+                                break;
+                            
+                            case 'classical':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.3;
+                                wave *= 1 - (time % 1);
+                                break;
+                            
+                            case 'pop':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.25;
+                                if (beat < 0.1) wave += Math.sin(2 * Math.PI * 60 * time) * 0.3;
+                                break;
+                            
+                            case 'rock':
+                                wave = Math.sign(Math.sin(2 * Math.PI * frequency * time)) * 0.2;
+                                wave += Math.sin(2 * Math.PI * frequency * 2 * time) * 0.1;
+                                if (beat < 0.15) wave += Math.random() * 0.3 - 0.15;
+                                break;
+                            
+                            case 'hiphop':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.2;
+                                if (beat < 0.2) wave += Math.sin(2 * Math.PI * 50 * time) * 0.4;
+                                if (beat > 0.5 && beat < 0.6) wave += Math.random() * 0.1;
+                                break;
+                            
+                            case 'reggae':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.25;
+                                if (beat > 0.25 && beat < 0.35) wave += Math.sin(2 * Math.PI * 80 * time) * 0.3;
+                                break;
+                            
+                            case 'funk':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.2;
+                                wave += Math.sin(2 * Math.PI * frequency * 0.5 * time) * 0.1;
+                                if (beat < 0.1 || (beat > 0.5 && beat < 0.6)) wave += Math.sin(2 * Math.PI * 60 * time) * 0.3;
+                                break;
+                            
+                            case 'disco':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.25;
+                                wave += Math.sin(2 * Math.PI * frequency * 2 * time) * 0.05;
+                                if (beat % 0.25 < 0.1) wave += Math.sin(2 * Math.PI * 80 * time) * 0.2;
+                                break;
+                            
+                            case 'techno':
+                                wave = Math.sign(Math.sin(2 * Math.PI * frequency * time)) * 0.15;
+                                if (beat < 0.05) wave = Math.sin(2 * Math.PI * 50 * time) * 0.5;
+                                wave += (Math.random() - 0.5) * 0.05;
+                                break;
+                            
+                            case 'house':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.2;
+                                if (beat < 0.1) wave = Math.sin(2 * Math.PI * 60 * time) * 0.4;
+                                wave += Math.sin(2 * Math.PI * frequency * 4 * time) * 0.05;
+                                break;
+                            
+                            case 'dnb':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.15;
+                                if (beat < 0.05) wave = Math.sin(2 * Math.PI * 40 * time) * 0.5;
+                                if (beat > 0.375 && beat < 0.425) wave += Math.random() * 0.3;
+                                wave += Math.sin(2 * Math.PI * frequency * 0.25 * time) * 0.1;
+                                break;
+                            
+                            case 'dubstep':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.2;
+                                if (beat < 0.1) wave = Math.sin(2 * Math.PI * 30 * time) * Math.sin(time * 10) * 0.5;
+                                wave *= (beat < 0.5) ? 1 : 0.3;
+                                break;
+                            
+                            case 'trap':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.15;
+                                if (beat < 0.1) wave = Math.sin(2 * Math.PI * 40 * time) * 0.5;
+                                if (beat > 0.7 && beat < 0.8) wave += Math.sin(2 * Math.PI * frequency * 4 * time) * 0.2;
+                                break;
+                            
+                            case 'latin':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.25;
+                                if ((beat * 8) % 3 < 0.2) wave += Math.sin(2 * Math.PI * 100 * time) * 0.2;
+                                wave += Math.sin(2 * Math.PI * frequency * 1.5 * time) * 0.05;
+                                break;
+                            
+                            case 'country':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.3;
+                                wave *= 0.8 + Math.sin(time * 8) * 0.2;
+                                if (beat < 0.1 || beat > 0.5 && beat < 0.6) wave += Math.sin(2 * Math.PI * 80 * time) * 0.2;
+                                break;
+                            
+                            case 'blues':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.25;
+                                wave += Math.sin(2 * Math.PI * frequency * 1.5 * time) * 0.1;
+                                wave *= 1 - (time % 0.5) * 0.5;
+                                break;
+                            
+                            case 'metal':
+                                wave = Math.sign(Math.sin(2 * Math.PI * frequency * time)) * 0.3;
+                                wave += Math.sign(Math.sin(2 * Math.PI * frequency * 0.5 * time)) * 0.1;
+                                if (beat < 0.05) wave = Math.random() * 0.5 - 0.25;
+                                break;
+                            
+                            case 'folk':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.3;
+                                wave += Math.sin(2 * Math.PI * frequency * 2 * time) * 0.05;
+                                wave *= 1 - (time % 0.25) * 0.3;
+                                break;
+                            
+                            case 'soul':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.25;
+                                wave += Math.sin(2 * Math.PI * frequency * 1.5 * time) * 0.1;
+                                wave += Math.sin(2 * Math.PI * frequency * 0.5 * time) * 0.05;
+                                break;
+                            
+                            case 'rnb':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.2;
+                                wave += Math.sin(2 * Math.PI * frequency * 2 * time) * 0.1;
+                                if (beat > 0.75) wave *= 0.5;
+                                break;
+                            
+                            case 'cinematic':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.15;
+                                wave += Math.sin(2 * Math.PI * frequency * 0.5 * time) * 0.1;
+                                wave += Math.sin(2 * Math.PI * frequency * 0.25 * time) * 0.05;
+                                wave *= Math.sin(time * 0.2) * 0.5 + 0.5;
+                                break;
+                            
+                            case '8bit':
+                                wave = Math.floor(Math.sin(2 * Math.PI * frequency * time) * 4) / 4 * 0.2;
+                                if (beat < 0.1) wave = Math.floor(Math.sin(2 * Math.PI * 55 * time) * 2) / 2 * 0.3;
+                                break;
+                            
+                            case 'lofi':
+                                wave = Math.sin(2 * Math.PI * frequency * time) * 0.2;
+                                wave += (Math.random() - 0.5) * 0.02;
+                                wave *= 0.7 + Math.sin(time * 3) * 0.3;
+                                if (beat < 0.1) wave += Math.sin(2 * Math.PI * 60 * time) * 0.2;
+                                break;
+                        }
+                        
+                        // Add some reverb effect
+                        if (i > sampleRate * 0.1) {
+                            wave += channelData[i - Math.floor(sampleRate * 0.1)] * 0.3;
+                        }
+                        
+                        channelData[i] = wave * (channel === 0 ? 0.8 : 0.7);
+                    }
+                }
+
+                generatedMusic = buffer;
+                status.textContent = '音楽の生成が完了しました！';
+                status.classList.remove('generating');
+                generateBtn.disabled = false;
+                playBtn.disabled = false;
+                
+                // Auto-play
+                playMusic();
+            }, 2000);
+        }
+
+        // Play generated music
+        function playMusic() {
+            if (!generatedMusic || isPlaying) return;
+
+            currentSource = audioContext.createBufferSource();
+            currentSource.buffer = generatedMusic;
+            currentSource.connect(audioContext.destination);
+            currentSource.start(0);
+            
+            isPlaying = true;
+            playBtn.disabled = true;
+            stopBtn.disabled = false;
+            status.textContent = '再生中...';
+
+            // Visualizer animation
+            animateVisualizer();
+
+            currentSource.onended = () => {
+                stopMusic();
+            };
+        }
+
+        // Stop music
+        function stopMusic() {
+            if (currentSource && isPlaying) {
+                currentSource.stop();
+                currentSource = null;
+            }
+            
+            isPlaying = false;
+            playBtn.disabled = false;
+            stopBtn.disabled = true;
+            status.textContent = '停止しました';
+        }
+
+        // Visualizer animation
+        function animateVisualizer() {
+            if (!isPlaying) return;
+
+            visualizerBars.forEach((bar, index) => {
+                const height = Math.random() * 80 + 20;
+                bar.style.height = `${height}%`;
+            });
+
+            requestAnimationFrame(animateVisualizer);
+        }
+
+        // Event listeners
+        generateBtn.addEventListener('click', generateMusic);
+        playBtn.addEventListener('click', playMusic);
+        stopBtn.addEventListener('click', stopMusic);
+
+        // Initial message
+        status.textContent = 'パラメータを選択して「生成」をクリックしてください';
+    </script>
+</body>
+</html>

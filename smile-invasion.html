@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スマイル進軍を倒そう！</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            background-color: #222;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-color: #333;
+            border: 2px solid #fff;
+        }
+        
+        #gameArea {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+        
+        .smile {
+            position: absolute;
+            font-size: 40px;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.1s;
+        }
+        
+        .smile:hover {
+            transform: scale(1.2);
+        }
+        
+        .explosion {
+            position: absolute;
+            font-size: 50px;
+            animation: explode 0.5s ease-out forwards;
+            pointer-events: none;
+        }
+        
+        @keyframes explode {
+            0% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        #scoreBoard {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        #timer {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            font-weight: bold;
+            display: none;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        #startButton {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        
+        #startButton:hover {
+            background-color: #45a049;
+        }
+        
+        .powerUp {
+            position: absolute;
+            font-size: 30px;
+            cursor: pointer;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="gameArea"></div>
+        <div id="scoreBoard">スコア: <span id="score">0</span></div>
+        <div id="timer">残り時間: <span id="time">60</span>秒</div>
+        <button id="startButton">ゲームスタート</button>
+        <div id="gameOver">
+            <p>ゲームオーバー！</p>
+            <p>最終スコア: <span id="finalScore"></span></p>
+            <button onclick="location.reload()">もう一度プレイ</button>
+        </div>
+    </div>
+
+    <script>
+        let score = 0;
+        let timeLeft = 60;
+        let gameActive = false;
+        let spawnInterval;
+        let timerInterval;
+        let powerUpInterval;
+        let speedMultiplier = 1;
+        
+        const gameArea = document.getElementById('gameArea');
+        const scoreDisplay = document.getElementById('score');
+        const timeDisplay = document.getElementById('time');
+        const startButton = document.getElementById('startButton');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        
+        const smiles = ['😊', '😄', '😃', '😁', '🙂', '😉', '😎', '🤗', '😇'];
+        const explosions = ['💥', '💫', '✨', '⭐'];
+        const powerUps = ['⚡', '🎯', '🔥'];
+        
+        startButton.addEventListener('click', startGame);
+        
+        function startGame() {
+            startButton.style.display = 'none';
+            gameActive = true;
+            score = 0;
+            timeLeft = 60;
+            speedMultiplier = 1;
+            
+            updateScore();
+            updateTimer();
+            
+            spawnInterval = setInterval(spawnSmile, 1000);
+            timerInterval = setInterval(updateTimer, 1000);
+            powerUpInterval = setInterval(spawnPowerUp, 10000);
+            
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => spawnSmile(), i * 300);
+            }
+        }
+        
+        function spawnSmile() {
+            if (!gameActive) return;
+            
+            const smile = document.createElement('div');
+            smile.className = 'smile';
+            smile.textContent = smiles[Math.floor(Math.random() * smiles.length)];
+            
+            const maxX = gameArea.offsetWidth - 50;
+            const maxY = gameArea.offsetHeight - 50;
+            
+            smile.style.left = Math.random() * maxX + 'px';
+            smile.style.top = Math.random() * maxY + 'px';
+            
+            const moveSpeed = (Math.random() * 2 + 1) * speedMultiplier;
+            const moveDirection = Math.random() * Math.PI * 2;
+            let x = parseFloat(smile.style.left);
+            let y = parseFloat(smile.style.top);
+            let dirX = Math.cos(moveDirection) * moveSpeed;
+            let dirY = Math.sin(moveDirection) * moveSpeed;
+            
+            smile.addEventListener('click', (e) => {
+                e.stopPropagation();
+                destroySmile(smile, e);
+            });
+            
+            gameArea.appendChild(smile);
+            
+            const moveInterval = setInterval(() => {
+                if (!gameActive) {
+                    clearInterval(moveInterval);
+                    return;
+                }
+                
+                x += dirX;
+                y += dirY;
+                
+                if (x <= 0 || x >= maxX) dirX = -dirX;
+                if (y <= 0 || y >= maxY) dirY = -dirY;
+                
+                smile.style.left = x + 'px';
+                smile.style.top = y + 'px';
+            }, 20);
+            
+            setTimeout(() => {
+                if (smile.parentNode) {
+                    smile.remove();
+                    clearInterval(moveInterval);
+                }
+            }, 5000);
+        }
+        
+        function spawnPowerUp() {
+            if (!gameActive) return;
+            
+            const powerUp = document.createElement('div');
+            powerUp.className = 'powerUp';
+            powerUp.textContent = powerUps[Math.floor(Math.random() * powerUps.length)];
+            
+            const maxX = gameArea.offsetWidth - 50;
+            const maxY = gameArea.offsetHeight - 50;
+            
+            powerUp.style.left = Math.random() * maxX + 'px';
+            powerUp.style.top = Math.random() * maxY + 'px';
+            
+            powerUp.addEventListener('click', (e) => {
+                e.stopPropagation();
+                activatePowerUp(powerUp.textContent);
+                powerUp.remove();
+            });
+            
+            gameArea.appendChild(powerUp);
+            
+            setTimeout(() => {
+                if (powerUp.parentNode) {
+                    powerUp.remove();
+                }
+            }, 3000);
+        }
+        
+        function activatePowerUp(type) {
+            switch(type) {
+                case '⚡':
+                    speedMultiplier = 0.5;
+                    setTimeout(() => speedMultiplier = 1, 5000);
+                    break;
+                case '🎯':
+                    score += 50;
+                    updateScore();
+                    break;
+                case '🔥':
+                    const allSmiles = document.querySelectorAll('.smile');
+                    allSmiles.forEach(smile => {
+                        destroySmile(smile, { clientX: parseFloat(smile.style.left) + 25, clientY: parseFloat(smile.style.top) + 25 });
+                    });
+                    break;
+            }
+        }
+        
+        function destroySmile(smile, event) {
+            score += 10;
+            updateScore();
+            
+            const explosion = document.createElement('div');
+            explosion.className = 'explosion';
+            explosion.textContent = explosions[Math.floor(Math.random() * explosions.length)];
+            explosion.style.left = smile.style.left;
+            explosion.style.top = smile.style.top;
+            
+            gameArea.appendChild(explosion);
+            smile.remove();
+            
+            setTimeout(() => explosion.remove(), 500);
+        }
+        
+        function updateScore() {
+            scoreDisplay.textContent = score;
+        }
+        
+        function updateTimer() {
+            timeLeft--;
+            timeDisplay.textContent = timeLeft;
+            
+            if (timeLeft <= 0) {
+                endGame();
+            }
+        }
+        
+        function endGame() {
+            gameActive = false;
+            clearInterval(spawnInterval);
+            clearInterval(timerInterval);
+            clearInterval(powerUpInterval);
+            
+            const allSmiles = document.querySelectorAll('.smile');
+            allSmiles.forEach(smile => smile.remove());
+            
+            const allPowerUps = document.querySelectorAll('.powerUp');
+            allPowerUps.forEach(powerUp => powerUp.remove());
+            
+            finalScoreDisplay.textContent = score;
+            gameOverScreen.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

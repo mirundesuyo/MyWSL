@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>弾幕ゲーム - Danmaku Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid #fff;
+            background-color: #111;
+            cursor: none;
+        }
+        #gameArea {
+            display: flex;
+            gap: 20px;
+        }
+        #sidePanel {
+            width: 200px;
+            height: 800px;
+            background: linear-gradient(to bottom, #1a1a2e, #0f0f1e);
+            border: 2px solid #444;
+            border-radius: 10px;
+            padding: 20px;
+            color: #fff;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        .statBox {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .statBox h3 {
+            margin: 0 0 10px 0;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+            font-size: 16px;
+        }
+        .statBox .value {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .livesDisplay {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .lifeIcon {
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            box-shadow: 0 0 10px #00ffff;
+        }
+        .powerBar {
+            width: 100%;
+            height: 20px;
+            background: #222;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .powerFill {
+            height: 100%;
+            background: linear-gradient(to right, #ff00ff, #ff88ff);
+            box-shadow: 0 0 10px #ff00ff;
+            transition: width 0.3s;
+        }
+        #stats {
+            color: #fff;
+            margin-top: 10px;
+            font-size: 18px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        }
+        #stats span {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        #controls {
+            color: #fff;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        #gameOver, #startScreen, #clearScreen, #menuScreen, #controlsScreen, #highScoreScreen {
+            position: absolute;
+            top: 400px;
+            left: 300px;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-size: 36px;
+            text-align: center;
+            display: none;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+            width: 320px;
+        }
+        #menuScreen {
+            display: block;
+        }
+        #gameContainer {
+            text-align: center;
+            position: relative;
+        }
+        #gameArea {
+            display: inline-flex;
+            gap: 20px;
+            position: relative;
+        }
+        #canvasWrapper {
+            position: relative;
+        }
+        #bossHPBar {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ff00ff;
+            border-radius: 10px;
+            display: none;
+            z-index: 100;
+        }
+        #bossHPFill {
+            height: 100%;
+            background: linear-gradient(to right, #ff0000, #ff6600);
+            border-radius: 8px;
+            transition: width 0.3s;
+        }
+        #bossName {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff00ff;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #ff00ff;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="gameArea">
+            <div id="canvasWrapper">
+                <canvas id="gameCanvas" width="600" height="800"></canvas>
+                <div id="bossHPBar">
+                    <div id="bossName"></div>
+                    <div id="bossHPFill"></div>
+                </div>
+                <div id="stats">
+                    <div>スコア: <span id="score">0</span></div>
+                </div>
+                <div id="controls">
+                    矢印キーで移動 | Shiftで低速移動 | Zでショット | Xでボム
+                </div>
+            </div>
+            <div id="sidePanel">
+                <div class="statBox">
+                    <h3>SCORE</h3>
+                    <div class="value" id="sideScore">0</div>
+                </div>
+                <div class="statBox">
+                    <h3>LIVES</h3>
+                    <div class="livesDisplay" id="livesDisplay"></div>
+                </div>
+                <div class="statBox">
+                    <h3>POWER</h3>
+                    <div class="value" id="sidePower">0.0</div>
+                    <div class="powerBar">
+                        <div class="powerFill" id="powerFill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="statBox">
+                    <h3>BOMBS</h3>
+                    <div class="value" id="sideBombs">3</div>
+                </div>
+            </div>
+        </div>
+        <div id="menuScreen">
+            <div>弾幕ゲーム</div>
+            <div style="font-size: 24px; margin-top: 20px;">DANMAKU GAME</div>
+            <button onclick="showDifficultySelect()" style="margin-top: 30px;">ゲームスタート</button>
+            <button onclick="showControls()" style="margin-top: 10px;">操作説明</button>
+            <button onclick="showHighScores()" style="margin-top: 10px;">ハイスコア</button>
+        </div>
+        <div id="startScreen">
+            <div>難易度選択</div>
+            <button onclick="startGame('easy')" style="margin-top: 30px;">EASY</button>
+            <button onclick="startGame('normal')" style="margin-top: 10px;">NORMAL</button>
+            <button onclick="startGame('hard')" style="margin-top: 10px;">HARD</button>
+            <button onclick="backToMenu()" style="margin-top: 20px;">メニューに戻る</button>
+        </div>
+        <div id="controlsScreen">
+            <div style="font-size: 28px;">操作説明</div>
+            <div style="font-size: 16px; margin-top: 20px; text-align: left;">
+                <div>矢印キー: 移動</div>
+                <div>Shift: 低速移動（当たり判定表示）</div>
+                <div>Z: ショット</div>
+                <div>X: ボム</div>
+                <div>ESC: ポーズ</div>
+            </div>
+            <button onclick="backToMenu()" style="margin-top: 30px;">メニューに戻る</button>
+        </div>
+        <div id="highScoreScreen">
+            <div style="font-size: 28px;">ハイスコア</div>
+            <div id="highScoreList" style="font-size: 20px; margin-top: 20px;">
+                <div>1st: <span id="score1">0</span></div>
+                <div>2nd: <span id="score2">0</span></div>
+                <div>3rd: <span id="score3">0</span></div>
+            </div>
+            <button onclick="backToMenu()" style="margin-top: 30px;">メニューに戻る</button>
+        </div>
+        <div id="gameOver">
+            <div>GAME OVER</div>
+            <div>最終スコア: <span id="finalScore">0</span></div>
+            <button onclick="resetGame()">もう一度プレイ</button>
+            <button onclick="backToMenu()" style="margin-top: 10px;">メニューに戻る</button>
+        </div>
+        <div id="clearScreen">
+            <div>ALL CLEAR!</div>
+            <div style="font-size: 24px; margin-top: 20px;">すべてのボスを撃破しました！</div>
+            <div>最終スコア: <span id="clearScore">0</span></div>
+            <button onclick="resetGame()" style="margin-top: 30px;">もう一度プレイ</button>
+            <button onclick="backToMenu()" style="margin-top: 10px;">メニューに戻る</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const game = {
+            score: 0,
+            lives: 3,
+            power: 0,
+            bombs: 3,
+            paused: false,
+            over: false,
+            started: false,
+            frameCount: 0,
+            difficulty: 1,
+            difficultyMultiplier: 1,
+            stage: 1,
+            bossesDefeated: 0,
+            currentBoss: null,
+            stageEnemySpawnPattern: 0,
+            highScores: JSON.parse(localStorage.getItem('danmakuHighScores') || '[0,0,0]'),
+            transitionEffect: false,
+            transitionProgress: 0
+        };
+
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 100,
+            radius: 4,
+            hitboxRadius: 2,
+            speed: 5,
+            slowSpeed: 2,
+            invulnerable: 0,
+            shooting: false,
+            shotCooldown: 0,
+            color: '#00ffff'
+        };
+
+        const keys = {
+            ArrowLeft: false,
+            ArrowRight: false,
+            ArrowUp: false,
+            ArrowDown: false,
+            Shift: false,
+            z: false,
+            Z: false,
+            x: false,
+            X: false,
+            Escape: false
+        };
+
+        let bullets = [];
+        let playerBullets = [];
+        let enemies = [];
+        let items = [];
+        let particles = [];
+
+        class Bullet {
+            constructor(x, y, angle, speed, radius = 4, color = '#ff0066') {
+                this.x = x;
+                this.y = y;
+                this.vx = Math.cos(angle) * speed * 0.5;
+                this.vy = Math.sin(angle) * speed * 0.5;
+                this.radius = radius;
+                this.color = color;
+                this.grazed = false;
+            }
+
+            update() {
+                if (this.homing && this.homingTime > 0) {
+                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    const currentAngle = Math.atan2(this.vy, this.vx);
+                    const angleDiff = angle - currentAngle;
+                    const turnSpeed = 0.05;
+                    const newAngle = currentAngle + Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), turnSpeed);
+                    const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                    this.vx = Math.cos(newAngle) * speed;
+                    this.vy = Math.sin(newAngle) * speed;
+                    this.homingTime--;
+                }
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            draw() {
+                // 外側に色付き、中心に白い円
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 中心の白い円
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            isOffScreen() {
+                return this.x < -50 || this.x > canvas.width + 50 || 
+                       this.y < -50 || this.y > canvas.height + 50;
+            }
+        }
+
+        const bossData = [
+            { name: '赤魔王', color: '#ff0000', hp: 100 },
+            { name: '青竜王', color: '#0066ff', hp: 150 },
+            { name: '緑妖精', color: '#00ff00', hp: 200 },
+            { name: '紫天使', color: '#9900ff', hp: 250 },
+            { name: '金光神', color: '#ffcc00', hp: 300 }
+        ];
+
+        class Enemy {
+            constructor(x, y, type = 'basic', stagePattern = 0) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.radius = 20;
+                this.stagePattern = stagePattern;
+                
+                if (type.startsWith('boss')) {
+                    const bossIndex = parseInt(type.split('_')[1]) || 0;
+                    const boss = bossData[bossIndex];
+                    this.hp = boss.hp;
+                    this.maxHp = this.hp;
+                    this.color = boss.color;
+                    this.bossName = boss.name;
+                    this.bossIndex = bossIndex;
+                    this.radius = 30;
+                } else {
+                    this.hp = 10 + game.stage * 5;
+                    this.maxHp = this.hp;
+                    this.color = this.getStageEnemyColor();
+                }
+                
+                this.shotCooldown = 0;
+                this.angle = 0;
+                this.movePattern = 0;
+                this.time = 0;
+            }
+            
+            getStageEnemyColor() {
+                const stageColors = ['#ff6600', '#00ccff', '#66ff00', '#ff00cc', '#ffff00'];
+                return stageColors[(game.stage - 1) % stageColors.length];
+            }
+
+            update() {
+                this.time++;
+                
+                if (this.type.startsWith('boss')) {
+                    this.updateBoss();
+                } else {
+                    this.updateRegularEnemy();
+                }
+            }
+            
+            updateRegularEnemy() {
+                switch(game.stage) {
+                    case 1:
+                        this.y += 1.5;
+                        this.x += Math.sin(this.time * 0.05) * 2;
+                        if (this.time % 80 === 0) {
+                            this.shootCircle(6);
+                        }
+                        break;
+                    case 2:
+                        this.y += 1.2;
+                        this.x += Math.cos(this.time * 0.04) * 3;
+                        if (this.time % 60 === 0) {
+                            this.shootCircle(8);
+                        }
+                        if (this.time % 90 === 0) {
+                            this.shootAimed();
+                        }
+                        break;
+                    case 3:
+                        this.y += 1;
+                        const centerX = canvas.width / 2;
+                        this.x = centerX + (this.x - centerX) * Math.cos(0.02);
+                        if (this.time % 50 === 0) {
+                            this.shootSpiral();
+                        }
+                        break;
+                    case 4:
+                        this.y += 0.8;
+                        if (this.stagePattern === 0) {
+                            this.x += 2;
+                        } else {
+                            this.x -= 2;
+                        }
+                        if (this.time % 40 === 0) {
+                            this.shootAimed();
+                            this.shootCircle(4);
+                        }
+                        break;
+                    case 5:
+                        this.y += 1 + Math.sin(this.time * 0.1) * 0.5;
+                        this.x += Math.sin(this.time * 0.03) * 4;
+                        if (this.time % 30 === 0) {
+                            this.shootCircle(12);
+                        }
+                        if (this.time % 45 === 0) {
+                            this.shootSpiral();
+                        }
+                        break;
+                }
+            }
+            
+            updateBoss() {
+                switch(this.bossIndex) {
+                    case 0:
+                        this.x = canvas.width / 2 + Math.sin(this.time * 0.02) * 150;
+                        this.y = 120;
+                        if (this.time % 40 === 0) {
+                            this.shootCircle(12);
+                        }
+                        if (this.time % 60 === 0) {
+                            this.shootFlower();
+                        }
+                        break;
+                    case 1:
+                        this.x = canvas.width / 2 + Math.sin(this.time * 0.03) * 200;
+                        this.y = 150 + Math.sin(this.time * 0.02) * 30;
+                        if (this.time % 20 === 0) {
+                            this.shootWave();
+                        }
+                        if (this.time % 80 === 0) {
+                            this.shootLaser();
+                        }
+                        break;
+                    case 2:
+                        const t = this.time * 0.02;
+                        this.x = canvas.width / 2 + Math.cos(t) * 180;
+                        this.y = 150 + Math.sin(t * 2) * 50;
+                        if (this.time % 15 === 0) {
+                            this.shootSpiral();
+                        }
+                        if (this.time % 50 === 0) {
+                            this.shootRandomBurst();
+                        }
+                        break;
+                    case 3:
+                        this.x = canvas.width / 2;
+                        this.y = 140 + Math.sin(this.time * 0.05) * 20;
+                        if (this.time % 30 === 0) {
+                            this.shootCross();
+                        }
+                        if (this.time % 70 === 0) {
+                            this.shootHoming();
+                        }
+                        break;
+                    case 4:
+                        const angle = this.time * 0.01;
+                        this.x = canvas.width / 2 + Math.cos(angle) * 150 * Math.sin(angle * 3);
+                        this.y = 150 + Math.sin(angle) * 100;
+                        if (this.time % 10 === 0) {
+                            this.shootGoldenSpiral();
+                        }
+                        if (this.time % 100 === 0) {
+                            this.shootMegaBurst();
+                        }
+                        break;
+                }
+            }
+
+            shootCircle(count) {
+                const angleStep = (Math.PI * 2) / count;
+                for (let i = 0; i < count; i++) {
+                    const angle = angleStep * i + this.angle;
+                    bullets.push(new Bullet(this.x, this.y, angle, 3 * game.difficultyMultiplier, 6, this.color + 'aa'));
+                }
+                this.angle += 0.2;
+            }
+
+            shootSpiral() {
+                const angle = this.angle;
+                bullets.push(new Bullet(this.x, this.y, angle, 4, 5, '#ffff00'));
+                this.angle += 0.3;
+            }
+
+            shootAimed() {
+                const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                for (let i = -1; i <= 1; i++) {
+                    bullets.push(new Bullet(this.x, this.y, angle + i * 0.2, 5, 7, '#00ff00'));
+                }
+            }
+            
+            shootFlower() {
+                for (let j = 0; j < 3; j++) {
+                    const baseAngle = this.angle + j * (Math.PI * 2 / 3);
+                    for (let i = 0; i < 5; i++) {
+                        const angle = baseAngle + (i - 2) * 0.1;
+                        bullets.push(new Bullet(this.x, this.y, angle, 3, 6, '#ff6666'));
+                    }
+                }
+                this.angle += 0.1;
+            }
+            
+            shootWave() {
+                const waveWidth = 10;
+                for (let i = 0; i < waveWidth; i++) {
+                    const x = this.x - 150 + (300 / waveWidth) * i;
+                    const angle = Math.PI / 2 + Math.sin(this.time * 0.1 + i * 0.5) * 0.3;
+                    bullets.push(new Bullet(x, this.y, angle, 3, 8, '#0099ff'));
+                }
+            }
+            
+            shootLaser() {
+                const targetAngle = Math.atan2(player.y - this.y, player.x - this.x);
+                for (let i = 0; i < 20; i++) {
+                    setTimeout(() => {
+                        bullets.push(new Bullet(this.x, this.y, targetAngle, 8, 10, '#00ffff'));
+                    }, i * 50);
+                }
+            }
+            
+            shootRandomBurst() {
+                for (let i = 0; i < 20; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = 2 + Math.random() * 4;
+                    bullets.push(new Bullet(this.x, this.y, angle, speed, 6, '#66ff66'));
+                }
+            }
+            
+            shootCross() {
+                for (let i = 0; i < 4; i++) {
+                    const baseAngle = i * Math.PI / 2 + this.angle;
+                    for (let j = 0; j < 8; j++) {
+                        bullets.push(new Bullet(this.x, this.y, baseAngle, 2 + j * 0.5, 5, '#cc66ff'));
+                    }
+                }
+                this.angle += 0.05;
+            }
+            
+            shootHoming() {
+                const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                for (let i = 0; i < 5; i++) {
+                    const bullet = new Bullet(this.x, this.y, angle + (i - 2) * 0.3, 3, 8, '#ff00ff');
+                    bullet.homing = true;
+                    bullet.homingTime = 60;
+                    bullets.push(bullet);
+                }
+            }
+            
+            shootGoldenSpiral() {
+                const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+                for (let i = 0; i < 8; i++) {
+                    const angle = this.angle + i * goldenAngle;
+                    const speed = 2 + (i % 3);
+                    bullets.push(new Bullet(this.x, this.y, angle, speed, 7, '#ffcc00'));
+                }
+                this.angle += 0.1;
+            }
+            
+            shootMegaBurst() {
+                for (let ring = 0; ring < 5; ring++) {
+                    setTimeout(() => {
+                        const count = 20 + ring * 4;
+                        for (let i = 0; i < count; i++) {
+                            const angle = (Math.PI * 2 / count) * i;
+                            bullets.push(new Bullet(this.x, this.y, angle, 3 + ring * 0.5, 8 - ring, '#ffaa00'));
+                        }
+                    }, ring * 100);
+                }
+            }
+
+            draw() {
+                ctx.save();
+                
+                if (this.type.startsWith('boss')) {
+                    this.drawBoss();
+                } else {
+                    this.drawRegularEnemy();
+                }
+                
+                ctx.restore();
+            }
+            
+            drawBoss() {
+                ctx.fillStyle = this.color;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = this.color;
+                
+                switch(this.bossIndex) {
+                    case 0:
+                        ctx.beginPath();
+                        for (let i = 0; i < 6; i++) {
+                            const angle = (Math.PI * 2 / 6) * i + this.time * 0.02;
+                            const x = this.x + Math.cos(angle) * this.radius;
+                            const y = this.y + Math.sin(angle) * this.radius;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        break;
+                    case 1:
+                        ctx.beginPath();
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (Math.PI * 2 / 8) * i;
+                            const r = this.radius + Math.sin(this.time * 0.05 + i) * 5;
+                            const x = this.x + Math.cos(angle) * r;
+                            const y = this.y + Math.sin(angle) * r;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        break;
+                    case 2:
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                        ctx.closePath();
+                        ctx.fill();
+                        for (let i = 0; i < 6; i++) {
+                            const angle = (Math.PI * 2 / 6) * i + this.time * 0.03;
+                            const x = this.x + Math.cos(angle) * this.radius * 1.5;
+                            const y = this.y + Math.sin(angle) * this.radius * 1.5;
+                            ctx.beginPath();
+                            ctx.arc(x, y, 8, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        return;
+                    case 3:
+                        ctx.beginPath();
+                        for (let i = 0; i < 4; i++) {
+                            const angle = (Math.PI / 2) * i + this.time * 0.01;
+                            const x = this.x + Math.cos(angle) * this.radius;
+                            const y = this.y + Math.sin(angle) * this.radius;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        break;
+                    case 4:
+                        const points = 12;
+                        ctx.beginPath();
+                        for (let i = 0; i < points; i++) {
+                            const angle = (Math.PI * 2 / points) * i;
+                            const r = i % 2 === 0 ? this.radius : this.radius * 0.6;
+                            const x = this.x + Math.cos(angle) * r;
+                            const y = this.y + Math.sin(angle) * r;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        break;
+                }
+                
+                ctx.fill();
+                ctx.stroke();
+            }
+            
+            drawRegularEnemy() {
+                ctx.fillStyle = this.color;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = this.color;
+                
+                switch(game.stage) {
+                    case 1:
+                        ctx.beginPath();
+                        ctx.moveTo(this.x, this.y - this.radius);
+                        ctx.lineTo(this.x + this.radius, this.y);
+                        ctx.lineTo(this.x, this.y + this.radius);
+                        ctx.lineTo(this.x - this.radius, this.y);
+                        ctx.closePath();
+                        break;
+                    case 2:
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                        ctx.closePath();
+                        break;
+                    case 3:
+                        ctx.beginPath();
+                        for (let i = 0; i < 3; i++) {
+                            const angle = (Math.PI * 2 / 3) * i - Math.PI / 2;
+                            const x = this.x + Math.cos(angle) * this.radius;
+                            const y = this.y + Math.sin(angle) * this.radius;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        break;
+                    case 4:
+                        ctx.beginPath();
+                        for (let i = 0; i < 5; i++) {
+                            const angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+                            const x = this.x + Math.cos(angle) * this.radius;
+                            const y = this.y + Math.sin(angle) * this.radius;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        break;
+                    case 5:
+                        const points = 8;
+                        ctx.beginPath();
+                        for (let i = 0; i < points; i++) {
+                            const angle = (Math.PI * 2 / points) * i;
+                            const r = i % 2 === 0 ? this.radius : this.radius * 0.7;
+                            const x = this.x + Math.cos(angle) * r;
+                            const y = this.y + Math.sin(angle) * r;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        break;
+                }
+                
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            takeDamage(damage) {
+                this.hp -= damage;
+                if (this.hp <= 0) {
+                    createExplosion(this.x, this.y, this.radius);
+                    
+                    if (this.type.startsWith('boss')) {
+                        game.score += 1000 * (this.bossIndex + 1);
+                        game.bossesDefeated++;
+                        game.currentBoss = null;
+                        game.stage++;
+                        document.getElementById('bossHPBar').style.display = 'none';
+                        
+                        for (let i = 0; i < 5; i++) {
+                            items.push(new Item(
+                                this.x + (Math.random() - 0.5) * 100,
+                                this.y + (Math.random() - 0.5) * 50,
+                                i < 3 ? 'power' : 'point'
+                            ));
+                        }
+                        
+                        if (game.bossesDefeated >= 5) {
+                            gameClear();
+                        }
+                    } else {
+                        game.score += 100 * game.stage;
+                        if (Math.random() < 0.3) {
+                            items.push(new Item(this.x, this.y, Math.random() < 0.5 ? 'power' : 'point'));
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        class Item {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.radius = 8;
+                this.vy = 2;
+                this.color = type === 'power' ? '#ff00ff' : '#00ff00';
+            }
+
+            update() {
+                this.y += this.vy;
+                
+                const dist = Math.hypot(player.x - this.x, player.y - this.y);
+                if (dist < 100 || keys.Shift) {
+                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    this.x += Math.cos(angle) * 8;
+                    this.y += Math.sin(angle) * 8;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                
+                // アイテムを回転する四角形で描画
+                const time = Date.now() * 0.002;
+                ctx.translate(this.x, this.y);
+                ctx.rotate(time);
+                
+                ctx.fillStyle = this.color;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = this.color;
+                
+                ctx.fillRect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+                ctx.strokeRect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+                
+                // アイテムタイプのシンボル
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.type === 'power' ? 'P' : '$', 0, 0);
+                
+                ctx.restore();
+            }
+        }
+
+        class PlayerBullet {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vy = -15;
+                this.radius = 3;
+                this.damage = 1 + game.power * 0.5;
+            }
+
+            update() {
+                this.y += this.vy;
+            }
+
+            draw() {
+                // シンプルなレーザーに変更
+                ctx.fillStyle = '#00ffff';
+                ctx.fillRect(this.x - 2, this.y - 15, 4, 20);
+            }
+        }
+
+        function createExplosion(x, y, radius) {
+            for (let i = 0; i < radius * 2; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 30,
+                    color: `hsl(${Math.random() * 60}, 100%, 50%)`
+                });
+            }
+        }
+
+        function updateSidePanel() {
+            // スコア更新
+            document.getElementById('sideScore').textContent = game.score;
+            
+            // 残機表示更新
+            const livesDisplay = document.getElementById('livesDisplay');
+            livesDisplay.innerHTML = '';
+            for (let i = 0; i < game.lives; i++) {
+                const lifeIcon = document.createElement('div');
+                lifeIcon.className = 'lifeIcon';
+                livesDisplay.appendChild(lifeIcon);
+            }
+            
+            // パワー更新
+            document.getElementById('sidePower').textContent = game.power.toFixed(1);
+            const powerPercentage = (game.power / 3) * 100;
+            document.getElementById('powerFill').style.width = powerPercentage + '%';
+            
+            // ボム数更新
+            document.getElementById('sideBombs').textContent = game.bombs;
+        }
+
+        function updatePlayer() {
+            const speed = keys.Shift ? player.slowSpeed : player.speed;
+            
+            if (keys.ArrowLeft && player.x > player.radius) {
+                player.x -= speed;
+            }
+            if (keys.ArrowRight && player.x < canvas.width - player.radius) {
+                player.x += speed;
+            }
+            if (keys.ArrowUp && player.y > player.radius) {
+                player.y -= speed;
+            }
+            if (keys.ArrowDown && player.y < canvas.height - player.radius) {
+                player.y += speed;
+            }
+
+            if ((keys.z || keys.Z) && player.shotCooldown <= 0) {
+                playerBullets.push(new PlayerBullet(player.x - 10, player.y));
+                playerBullets.push(new PlayerBullet(player.x + 10, player.y));
+                if (game.power >= 1) {
+                    playerBullets.push(new PlayerBullet(player.x - 20, player.y));
+                    playerBullets.push(new PlayerBullet(player.x + 20, player.y));
+                }
+                if (game.power >= 2) {
+                    playerBullets.push(new PlayerBullet(player.x, player.y - 10));
+                }
+                player.shotCooldown = 5;
+            }
+
+            if ((keys.x || keys.X) && game.bombs > 0 && player.invulnerable <= 0) {
+                useBomb();
+            }
+
+            if (player.shotCooldown > 0) player.shotCooldown--;
+            if (player.invulnerable > 0) player.invulnerable--;
+        }
+
+        function useBomb() {
+            game.bombs--;
+            player.invulnerable = 180;
+            bullets.length = 0;
+            
+            enemies.forEach(enemy => {
+                enemy.takeDamage(50);
+            });
+            
+            for (let i = 0; i < 50; i++) {
+                const angle = (Math.PI * 2 / 50) * i;
+                particles.push({
+                    x: player.x,
+                    y: player.y,
+                    vx: Math.cos(angle) * 10,
+                    vy: Math.sin(angle) * 10,
+                    life: 60,
+                    color: '#ffffff'
+                });
+            }
+        }
+
+        function spawnEnemies() {
+            if (!game.currentBoss && game.frameCount % 90 === 0) {
+                const spawnPatterns = [
+                    [canvas.width * 0.25, 0],
+                    [canvas.width * 0.5, 0],
+                    [canvas.width * 0.75, 0],
+                    [canvas.width * 0.5, 1],
+                    [canvas.width * 0.33, 0],
+                    [canvas.width * 0.67, 1]
+                ];
+                
+                const pattern = spawnPatterns[game.stageEnemySpawnPattern % spawnPatterns.length];
+                enemies.push(new Enemy(pattern[0], -50, 'regular', pattern[1]));
+                game.stageEnemySpawnPattern++;
+            }
+            
+            if (game.frameCount % 1200 === 0 && !game.currentBoss && game.bossesDefeated < 5) {
+                const boss = new Enemy(canvas.width / 2, -100, `boss_${game.bossesDefeated}`);
+                enemies.push(boss);
+                game.currentBoss = boss;
+                
+                const bossHPBar = document.getElementById('bossHPBar');
+                const bossName = document.getElementById('bossName');
+                bossHPBar.style.display = 'block';
+                bossName.textContent = boss.bossName;
+            }
+        }
+
+        function checkCollisions() {
+            bullets.forEach((bullet, bulletIndex) => {
+                const dist = Math.hypot(player.x - bullet.x, player.y - bullet.y);
+                
+                if (!bullet.grazed && dist < bullet.radius + player.radius && dist > bullet.radius + player.hitboxRadius) {
+                    bullet.grazed = true;
+                    game.score += 10;
+                    createExplosion(bullet.x, bullet.y, 2);
+                }
+                
+                if (player.invulnerable <= 0 && dist < bullet.radius + player.hitboxRadius) {
+                    playerHit();
+                    bullets.splice(bulletIndex, 1);
+                }
+            });
+
+            playerBullets.forEach((pBullet, pIndex) => {
+                enemies.forEach((enemy, eIndex) => {
+                    const dist = Math.hypot(enemy.x - pBullet.x, enemy.y - pBullet.y);
+                    if (dist < enemy.radius + pBullet.radius) {
+                        if (enemy.takeDamage(pBullet.damage)) {
+                            enemies.splice(eIndex, 1);
+                        }
+                        playerBullets.splice(pIndex, 1);
+                    }
+                });
+            });
+
+            items.forEach((item, index) => {
+                const dist = Math.hypot(player.x - item.x, player.y - item.y);
+                if (dist < player.radius + item.radius) {
+                    if (item.type === 'power') {
+                        game.power = Math.min(game.power + 0.1, 3);
+                    } else {
+                        game.score += 50;
+                    }
+                    items.splice(index, 1);
+                }
+            });
+        }
+
+        function playerHit() {
+            game.lives--;
+            player.invulnerable = 180;
+            game.bombs = 3;
+            createExplosion(player.x, player.y, 20);
+            
+            if (game.lives <= 0) {
+                gameOver();
+            }
+        }
+
+        function gameOver() {
+            game.over = true;
+            document.getElementById('finalScore').textContent = game.score;
+            document.getElementById('gameOver').style.display = 'block';
+            updateHighScores();
+        }
+
+        function showDifficultySelect() {
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'block';
+        }
+        
+        function showControls() {
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('controlsScreen').style.display = 'block';
+        }
+        
+        function showHighScores() {
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('highScoreScreen').style.display = 'block';
+            document.getElementById('score1').textContent = game.highScores[0];
+            document.getElementById('score2').textContent = game.highScores[1];
+            document.getElementById('score3').textContent = game.highScores[2];
+        }
+        
+        function backToMenu() {
+            // トランジション演出を開始
+            game.transitionEffect = true;
+            game.transitionProgress = 0;
+            
+            // 演出後にメニューに戻る
+            setTimeout(() => {
+                document.getElementById('startScreen').style.display = 'none';
+                document.getElementById('controlsScreen').style.display = 'none';
+                document.getElementById('highScoreScreen').style.display = 'none';
+                document.getElementById('gameOver').style.display = 'none';
+                document.getElementById('clearScreen').style.display = 'none';
+                document.getElementById('menuScreen').style.display = 'block';
+                game.started = false;
+                game.over = false;
+                game.paused = false;
+                game.transitionEffect = false;
+                
+                // ゲーム状態をリセット
+                bullets.length = 0;
+                playerBullets.length = 0;
+                enemies.length = 0;
+                items.length = 0;
+                particles.length = 0;
+                game.currentBoss = null;
+                document.getElementById('bossHPBar').style.display = 'none';
+                
+                // サイドパネルをリセット
+                game.score = 0;
+                game.lives = 3;
+                game.power = 0;
+                game.bombs = 3;
+                game.stage = 1;
+                game.bossesDefeated = 0;
+                updateSidePanel();
+            }, 1500);
+        }
+        
+        function startGame(difficulty) {
+            game.started = true;
+            document.getElementById('startScreen').style.display = 'none';
+            
+            switch(difficulty) {
+                case 'easy':
+                    game.difficultyMultiplier = 0.7;
+                    game.lives = 5;
+                    game.bombs = 5;
+                    break;
+                case 'normal':
+                    game.difficultyMultiplier = 1;
+                    game.lives = 3;
+                    game.bombs = 3;
+                    break;
+                case 'hard':
+                    game.difficultyMultiplier = 1.5;
+                    game.lives = 2;
+                    game.bombs = 2;
+                    break;
+            }
+            resetGame();
+        }
+
+        function gameClear() {
+            game.over = true;
+            document.getElementById('clearScore').textContent = game.score;
+            document.getElementById('clearScreen').style.display = 'block';
+            updateHighScores();
+        }
+        
+        function updateHighScores() {
+            const scores = [...game.highScores];
+            scores.push(game.score);
+            scores.sort((a, b) => b - a);
+            game.highScores = scores.slice(0, 3);
+            localStorage.setItem('danmakuHighScores', JSON.stringify(game.highScores));
+        }
+        
+        function resetGame() {
+            game.score = 0;
+            game.lives = 3;
+            game.power = 0;
+            game.bombs = 3;
+            game.over = false;
+            game.frameCount = 0;
+            game.stage = 1;
+            game.bossesDefeated = 0;
+            game.currentBoss = null;
+            game.stageEnemySpawnPattern = 0;
+            player.x = canvas.width / 2;
+            player.y = canvas.height - 100;
+            player.invulnerable = 0;
+            player.shotCooldown = 0;
+            bullets.length = 0;
+            playerBullets.length = 0;
+            enemies.length = 0;
+            items.length = 0;
+            particles.length = 0;
+            Object.keys(keys).forEach(key => {
+                keys[key] = false;
+            });
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('clearScreen').style.display = 'none';
+            document.getElementById('bossHPBar').style.display = 'none';
+        }
+
+        function updateParticles() {
+            particles.forEach((particle, index) => {
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life--;
+                particle.vx *= 0.98;
+                particle.vy *= 0.98;
+                
+                if (particle.life <= 0) {
+                    particles.splice(index, 1);
+                }
+            });
+        }
+
+        function draw() {
+            // 背景グラデーション
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#000033');
+            gradient.addColorStop(1, '#000066');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 星の背景
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 73 + game.frameCount * 0.5) % canvas.width;
+                const y = (i * 37) % canvas.height;
+                ctx.fillRect(x, y, 1, 1);
+            }
+
+            particles.forEach(particle => {
+                ctx.save();
+                ctx.globalAlpha = particle.life / 30;
+                ctx.fillStyle = particle.color;
+                ctx.fillRect(particle.x - 2, particle.y - 2, 4, 4);
+                ctx.restore();
+            });
+
+            items.forEach(item => item.draw());
+            enemies.forEach(enemy => enemy.draw());
+            bullets.forEach(bullet => bullet.draw());
+            playerBullets.forEach(bullet => bullet.draw());
+
+            ctx.save();
+            if (player.invulnerable > 0 && player.invulnerable % 6 < 3) {
+                ctx.globalAlpha = 0.5;
+            }
+            
+            // プレイヤーを三角形で描画
+            ctx.fillStyle = player.color;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = player.color;
+            ctx.beginPath();
+            ctx.moveTo(player.x, player.y - player.radius * 2);
+            ctx.lineTo(player.x - player.radius * 1.5, player.y + player.radius);
+            ctx.lineTo(player.x + player.radius * 1.5, player.y + player.radius);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            if (keys.Shift) {
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.hitboxRadius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            if (game.currentBoss) {
+                const hpPercentage = (game.currentBoss.hp / game.currentBoss.maxHp) * 100;
+                document.getElementById('bossHPFill').style.width = hpPercentage + '%';
+            }
+            
+            updateSidePanel();
+            
+            document.getElementById('score').textContent = game.score;
+        }
+
+        function gameLoop() {
+            if (game.started && !game.over) {
+                if (!game.paused) {
+                    game.frameCount++;
+                    
+                    updatePlayer();
+                    spawnEnemies();
+                    
+                    enemies.forEach(enemy => enemy.update());
+                    bullets.forEach(bullet => bullet.update());
+                    playerBullets.forEach(bullet => bullet.update());
+                    items.forEach(item => item.update());
+                    updateParticles();
+                    
+                    bullets = bullets.filter(bullet => !bullet.isOffScreen());
+                    playerBullets = playerBullets.filter(bullet => bullet.y > -20);
+                    enemies = enemies.filter(enemy => enemy.y < canvas.height + 100);
+                    items = items.filter(item => item.y < canvas.height + 20);
+                    
+                    checkCollisions();
+                }
+                draw();
+                
+                if (game.paused) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    
+                    // ポーズ画面の背景ボックス
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+                    ctx.fillRect(canvas.width / 2 - 200, canvas.height / 2 - 100, 400, 250);
+                    
+                    // 枠線
+                    ctx.strokeStyle = '#00ffff';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(canvas.width / 2 - 200, canvas.height / 2 - 100, 400, 250);
+                    
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2 - 40);
+                    ctx.font = '24px Arial';
+                    ctx.fillText('Press ESC to resume', canvas.width / 2, canvas.height / 2 + 10);
+                    ctx.fillText('Press M to return to menu', canvas.width / 2, canvas.height / 2 + 40);
+                }
+            } else if (!game.started) {
+                ctx.fillStyle = '#111';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            // トランジション演出
+            if (game.transitionEffect) {
+                game.transitionProgress += 0.02;
+                if (game.transitionProgress > 1) game.transitionProgress = 1;
+                
+                // 円形ワイプエフェクト
+                ctx.save();
+                ctx.fillStyle = '#000';
+                const maxRadius = Math.sqrt(canvas.width * canvas.width + canvas.height * canvas.height);
+                const currentRadius = maxRadius * (1 - game.transitionProgress);
+                
+                ctx.beginPath();
+                ctx.rect(0, 0, canvas.width, canvas.height);
+                ctx.arc(canvas.width / 2, canvas.height / 2, currentRadius, 0, Math.PI * 2, true);
+                ctx.fill();
+                
+                // 光の輪
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 3;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#00ffff';
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, currentRadius, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // パーティクルエフェクト
+                for (let i = 0; i < 5; i++) {
+                    const angle = (Math.PI * 2 / 5) * i + game.transitionProgress * Math.PI;
+                    const x = canvas.width / 2 + Math.cos(angle) * currentRadius;
+                    const y = canvas.height / 2 + Math.sin(angle) * currentRadius;
+                    
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(x, y, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && game.started && !game.over) {
+                game.paused = !game.paused;
+                e.preventDefault();
+            } else if ((e.key === 'm' || e.key === 'M') && game.paused) {
+                backToMenu();
+                e.preventDefault();
+            } else if (e.key in keys && !game.paused) {
+                keys[e.key] = true;
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = false;
+                e.preventDefault();
+            }
+        });
+        
+        // ウィンドウのフォーカス喪失時にキーをリセット
+        window.addEventListener('blur', () => {
+            Object.keys(keys).forEach(key => {
+                keys[key] = false;
+            });
+        });
+
+        gameLoop();
+    </script>
+</body>
+</html>

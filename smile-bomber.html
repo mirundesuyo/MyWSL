@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スマイル帝国破壊ゲーム</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 50%, #B0E0E6 100%);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            border: 2px solid #333;
+            background: linear-gradient(to bottom, #87CEEB 0%, #FFF 100%);
+        }
+        
+        #gameInfo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #333;
+            font-size: 20px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(255,255,255,0.8);
+        }
+        
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        #gameOver h2 {
+            margin: 0 0 20px 0;
+            font-size: 36px;
+        }
+        
+        #restartBtn {
+            padding: 10px 30px;
+            font-size: 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        #restartBtn:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameInfo">
+        <div>スコア: <span id="score">0</span></div>
+        <div>残り建物: <span id="remaining">0</span></div>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="gameOver">
+        <h2>ミッション完了！</h2>
+        <p>スマイル帝国を破壊しました！</p>
+        <p>最終スコア: <span id="finalScore">0</span></p>
+        <button id="restartBtn" onclick="location.reload()">もう一度プレイ</button>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // ゲーム変数
+        let score = 0;
+        let gameActive = true;
+        let buildings = [];
+        let smileBombs = [];
+        let explosions = [];
+        let clouds = [];
+        
+        // 戦闘機
+        const fighter = {
+            x: 50,
+            y: 100,
+            width: 60,
+            height: 30,
+            speed: 3,
+            direction: 1
+        };
+        
+        // 建物クラス
+        class Building {
+            constructor(x, y, width, height) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.hp = 3;
+                this.color = this.getRandomColor();
+                this.destroyed = false;
+            }
+            
+            getRandomColor() {
+                const colors = ['#8B4513', '#A52A2A', '#696969', '#708090', '#CD853F'];
+                return colors[Math.floor(Math.random() * colors.length)];
+            }
+            
+            draw() {
+                if (!this.destroyed) {
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                    
+                    // 窓を描画
+                    ctx.fillStyle = this.hp > 1 ? '#FFD700' : '#333';
+                    const windowSize = 8;
+                    const windowGap = 4;
+                    for (let wx = this.x + 10; wx < this.x + this.width - 10; wx += windowSize + windowGap) {
+                        for (let wy = this.y + 10; wy < this.y + this.height - 10; wy += windowSize + windowGap) {
+                            ctx.fillRect(wx, wy, windowSize, windowSize);
+                        }
+                    }
+                    
+                    // スマイル帝国のマーク
+                    ctx.fillStyle = '#FFD700';
+                    ctx.font = '20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('😈', this.x + this.width / 2, this.y + 30);
+                }
+            }
+            
+            hit() {
+                this.hp--;
+                if (this.hp <= 0) {
+                    this.destroyed = true;
+                    score += 100;
+                    createExplosion(this.x + this.width / 2, this.y + this.height / 2);
+                    return true;
+                }
+                return false;
+            }
+        }
+        
+        // スマイル爆弾クラス
+        class SmileBomb {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.speed = 4;
+                this.rotation = 0;
+                this.active = true;
+            }
+            
+            update() {
+                this.y += this.speed;
+                this.rotation += 0.1;
+                
+                // 画面外に出たら非アクティブに
+                if (this.y > canvas.height) {
+                    this.active = false;
+                }
+                
+                // 建物との衝突判定
+                buildings.forEach(building => {
+                    if (!building.destroyed &&
+                        this.x > building.x &&
+                        this.x < building.x + building.width &&
+                        this.y > building.y &&
+                        this.y < building.y + building.height) {
+                        
+                        if (building.hit()) {
+                            // 建物が破壊された
+                        }
+                        this.active = false;
+                    }
+                });
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('😊', 0, 0);
+                ctx.restore();
+            }
+        }
+        
+        // 爆発エフェクト
+        class Explosion {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 0;
+                this.maxRadius = 50;
+                this.opacity = 1;
+                this.active = true;
+            }
+            
+            update() {
+                this.radius += 3;
+                this.opacity -= 0.02;
+                
+                if (this.radius > this.maxRadius || this.opacity <= 0) {
+                    this.active = false;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.opacity;
+                
+                // 爆発の円
+                ctx.fillStyle = '#FFA500';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 内側の円
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+        
+        // 雲クラス
+        class Cloud {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.speed = 0.5 + Math.random() * 0.5;
+                this.scale = 0.5 + Math.random() * 0.5;
+            }
+            
+            update() {
+                this.x -= this.speed;
+                if (this.x < -100) {
+                    this.x = canvas.width + 100;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = 0.7;
+                ctx.fillStyle = 'white';
+                
+                // 雲の形を円で構成
+                const baseX = this.x;
+                const baseY = this.y;
+                const size = 30 * this.scale;
+                
+                ctx.beginPath();
+                ctx.arc(baseX, baseY, size, 0, Math.PI * 2);
+                ctx.arc(baseX + size, baseY, size * 0.8, 0, Math.PI * 2);
+                ctx.arc(baseX - size, baseY, size * 0.8, 0, Math.PI * 2);
+                ctx.arc(baseX + size/2, baseY - size/2, size * 0.7, 0, Math.PI * 2);
+                ctx.arc(baseX - size/2, baseY - size/2, size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+        
+        // 初期化
+        function init() {
+            // 建物を生成
+            const buildingCount = 8;
+            const minWidth = 60;
+            const maxWidth = 100;
+            const minHeight = 150;
+            const maxHeight = 300;
+            
+            for (let i = 0; i < buildingCount; i++) {
+                const width = minWidth + Math.random() * (maxWidth - minWidth);
+                const height = minHeight + Math.random() * (maxHeight - minHeight);
+                const x = 50 + (canvas.width - 100) / buildingCount * i;
+                const y = canvas.height - height - 50;
+                
+                buildings.push(new Building(x, y, width, height));
+            }
+            
+            // 雲を生成
+            for (let i = 0; i < 5; i++) {
+                clouds.push(new Cloud(
+                    Math.random() * canvas.width,
+                    50 + Math.random() * 150
+                ));
+            }
+            
+            updateGameInfo();
+        }
+        
+        // 爆発を作成
+        function createExplosion(x, y) {
+            explosions.push(new Explosion(x, y));
+        }
+        
+        // ゲーム情報を更新
+        function updateGameInfo() {
+            document.getElementById('score').textContent = score;
+            const remaining = buildings.filter(b => !b.destroyed).length;
+            document.getElementById('remaining').textContent = remaining;
+            
+            if (remaining === 0 && gameActive) {
+                gameOver();
+            }
+        }
+        
+        // ゲームオーバー
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+        
+        // 戦闘機を描画
+        function drawFighter() {
+            ctx.save();
+            
+            // 機体
+            ctx.fillStyle = '#4169E1';
+            ctx.fillRect(fighter.x, fighter.y, fighter.width, fighter.height * 0.6);
+            
+            // 翼
+            ctx.fillStyle = '#1E90FF';
+            ctx.beginPath();
+            ctx.moveTo(fighter.x + 10, fighter.y + fighter.height * 0.3);
+            ctx.lineTo(fighter.x - 10, fighter.y + fighter.height);
+            ctx.lineTo(fighter.x + 20, fighter.y + fighter.height * 0.3);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.moveTo(fighter.x + fighter.width - 10, fighter.y + fighter.height * 0.3);
+            ctx.lineTo(fighter.x + fighter.width + 10, fighter.y + fighter.height);
+            ctx.lineTo(fighter.x + fighter.width - 20, fighter.y + fighter.height * 0.3);
+            ctx.fill();
+            
+            // コックピット
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(fighter.x + fighter.width * 0.7, fighter.y + 5, fighter.width * 0.2, fighter.height * 0.4);
+            
+            ctx.restore();
+        }
+        
+        // 地面を描画
+        function drawGround() {
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+            
+            // 草
+            ctx.fillStyle = '#228B22';
+            ctx.fillRect(0, canvas.height - 50, canvas.width, 10);
+        }
+        
+        // キー入力処理
+        const keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            
+            // スペースキーで爆弾投下
+            if (e.key === ' ' && gameActive) {
+                smileBombs.push(new SmileBomb(fighter.x + fighter.width / 2, fighter.y + fighter.height));
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+        
+        // ゲームループ
+        function gameLoop() {
+            // クリア
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 背景グラデーション
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.5, '#98D8E8');
+            gradient.addColorStop(1, '#B0E0E6');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // 雲を更新・描画
+            clouds.forEach(cloud => {
+                cloud.update();
+                cloud.draw();
+            });
+            
+            if (gameActive) {
+                // 戦闘機の移動
+                fighter.x += fighter.speed * fighter.direction;
+                
+                // 画面端で折り返し
+                if (fighter.x > canvas.width - fighter.width || fighter.x < 0) {
+                    fighter.direction *= -1;
+                }
+                
+                // キー入力による上下移動
+                if (keys['ArrowUp'] && fighter.y > 20) {
+                    fighter.y -= 3;
+                }
+                if (keys['ArrowDown'] && fighter.y < canvas.height / 2) {
+                    fighter.y += 3;
+                }
+            }
+            
+            // 戦闘機を描画
+            drawFighter();
+            
+            // スマイル爆弾を更新・描画
+            smileBombs = smileBombs.filter(bomb => {
+                if (bomb.active) {
+                    bomb.update();
+                    bomb.draw();
+                    return true;
+                }
+                return false;
+            });
+            
+            // 地面を描画
+            drawGround();
+            
+            // 建物を描画
+            buildings.forEach(building => {
+                building.draw();
+            });
+            
+            // 爆発を更新・描画
+            explosions = explosions.filter(explosion => {
+                if (explosion.active) {
+                    explosion.update();
+                    explosion.draw();
+                    return true;
+                }
+                return false;
+            });
+            
+            // ゲーム情報を更新
+            updateGameInfo();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // ゲーム開始
+        init();
+        gameLoop();
+    </script>
+</body>
+</html>

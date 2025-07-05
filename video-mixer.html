@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Video AI Mixer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0a;
+            color: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        main {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 3rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .video-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .video-card {
+            background: #1a1a1a;
+            border-radius: 15px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .video-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .video-card h3 {
+            margin-bottom: 1rem;
+            color: #667eea;
+        }
+
+        .video-wrapper {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .mixed-video-section {
+            background: #1a1a1a;
+            border-radius: 15px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .mixed-video-section h2 {
+            margin-bottom: 1.5rem;
+            color: #667eea;
+            font-size: 2rem;
+        }
+
+        #mixedCanvas {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #ff4444;
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 1rem 0;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🌍 Global Video AI Mixer</h1>
+        <p class="subtitle">世界中の動画から3つをランダムに選んでAIでミックス</p>
+    </header>
+
+    <main>
+        <div class="controls">
+            <button id="fetchVideosBtn" onclick="fetchRandomVideos()">
+                🎲 ランダム動画を取得
+            </button>
+            <button id="mixVideosBtn" onclick="mixVideos()" disabled>
+                🎨 動画をミックス
+            </button>
+            <button id="downloadBtn" onclick="downloadMixed()" disabled>
+                💾 ダウンロード
+            </button>
+        </div>
+
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            <p>処理中...</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="video-container" id="videoContainer">
+            <!-- 動画カードがここに動的に追加されます -->
+        </div>
+
+        <div class="mixed-video-section" id="mixedSection" style="display: none;">
+            <h2>🎬 AIミックス結果</h2>
+            <canvas id="mixedCanvas" width="1280" height="720"></canvas>
+        </div>
+    </main>
+
+    <script>
+        // サンプル動画URL（実際のAPIでは世界中の動画を取得）
+        const sampleVideos = [
+            {
+                url: 'https://www.w3schools.com/html/mov_bbb.mp4',
+                title: 'Big Buck Bunny',
+                country: '🇺🇸 USA'
+            },
+            {
+                url: 'https://www.w3schools.com/html/movie.mp4',
+                title: 'Sample Movie',
+                country: '🇬🇧 UK'
+            },
+            {
+                url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+                title: 'Nature Scene',
+                country: '🇯🇵 Japan'
+            }
+        ];
+
+        let selectedVideos = [];
+        let videoElements = [];
+        let mixedData = null;
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('active');
+            setTimeout(() => {
+                errorDiv.classList.remove('active');
+            }, 5000);
+        }
+
+        function showLoading(show) {
+            const loading = document.getElementById('loadingIndicator');
+            if (show) {
+                loading.classList.add('active');
+            } else {
+                loading.classList.remove('active');
+            }
+        }
+
+        async function fetchRandomVideos() {
+            showLoading(true);
+            const container = document.getElementById('videoContainer');
+            container.innerHTML = '';
+            selectedVideos = [];
+            videoElements = [];
+
+            // ランダムに3つの動画を選択（実際のAPIでは世界中から取得）
+            for (let i = 0; i < 3; i++) {
+                const randomIndex = Math.floor(Math.random() * sampleVideos.length);
+                const videoData = { ...sampleVideos[randomIndex], id: i };
+                selectedVideos.push(videoData);
+
+                const card = createVideoCard(videoData);
+                container.appendChild(card);
+            }
+
+            document.getElementById('mixVideosBtn').disabled = false;
+            showLoading(false);
+        }
+
+        function createVideoCard(videoData) {
+            const card = document.createElement('div');
+            card.className = 'video-card';
+            card.innerHTML = `
+                <h3>${videoData.title}</h3>
+                <p>${videoData.country}</p>
+                <div class="video-wrapper">
+                    <video id="video-${videoData.id}" controls crossorigin="anonymous">
+                        <source src="${videoData.url}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            `;
+
+            const video = card.querySelector('video');
+            videoElements.push(video);
+
+            return card;
+        }
+
+        async function mixVideos() {
+            if (videoElements.length !== 3) {
+                showError('3つの動画が必要です');
+                return;
+            }
+
+            showLoading(true);
+            document.getElementById('mixVideosBtn').disabled = true;
+
+            const canvas = document.getElementById('mixedCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 動画の読み込みを待つ
+            await Promise.all(videoElements.map(video => {
+                return new Promise((resolve) => {
+                    if (video.readyState >= 2) {
+                        resolve();
+                    } else {
+                        video.addEventListener('loadeddata', resolve, { once: true });
+                    }
+                });
+            }));
+
+            // AIミックスのシミュレーション
+            // 実際の実装では、WebGLやTensorFlow.jsを使用して高度な処理を行う
+            performAIMixing(canvas, ctx);
+
+            document.getElementById('mixedSection').style.display = 'block';
+            document.getElementById('downloadBtn').disabled = false;
+            document.getElementById('mixVideosBtn').disabled = false;
+            showLoading(false);
+
+            // ミックス後のセクションまでスクロール
+            document.getElementById('mixedSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function performAIMixing(canvas, ctx) {
+            // グラデーションとブレンドエフェクトを適用
+            const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            gradient.addColorStop(0, 'rgba(102, 126, 234, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(118, 75, 162, 0.3)');
+            gradient.addColorStop(1, 'rgba(102, 126, 234, 0.3)');
+
+            // 各動画からフレームを取得して合成
+            ctx.globalCompositeOperation = 'screen';
+            
+            // 動画1を左側に配置
+            if (videoElements[0]) {
+                ctx.globalAlpha = 0.7;
+                ctx.drawImage(videoElements[0], 0, 0, canvas.width * 0.5, canvas.height);
+            }
+
+            // 動画2を右側に配置
+            if (videoElements[1]) {
+                ctx.globalAlpha = 0.7;
+                ctx.drawImage(videoElements[1], canvas.width * 0.5, 0, canvas.width * 0.5, canvas.height);
+            }
+
+            // 動画3を中央にオーバーレイ
+            if (videoElements[2]) {
+                ctx.globalCompositeOperation = 'overlay';
+                ctx.globalAlpha = 0.5;
+                ctx.drawImage(videoElements[2], canvas.width * 0.25, canvas.height * 0.25, 
+                             canvas.width * 0.5, canvas.height * 0.5);
+            }
+
+            // グラデーションオーバーレイ
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // エフェクトテキスト
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 10;
+            ctx.fillText('AI MIXED', canvas.width / 2, canvas.height / 2);
+
+            // 結果を保存
+            mixedData = canvas.toDataURL('image/png');
+        }
+
+        function downloadMixed() {
+            if (!mixedData) {
+                showError('ミックスされた動画がありません');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.download = 'ai-mixed-video.png';
+            link.href = mixedData;
+            link.click();
+        }
+
+        // ページ読み込み時に初期動画を取得
+        window.addEventListener('load', () => {
+            fetchRandomVideos();
+        });
+    </script>
+</body>
+</html>
