@@ -110,9 +110,26 @@
             color: #0a0a0a;
             box-shadow: 0 0 20px #ff0000;
         }
+        .home-link {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: #333;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background 0.3s ease;
+            z-index: 10;
+        }
+        .home-link:hover {
+            background: #555;
+        }
     </style>
 </head>
 <body>
+    <a href="index.html" class="home-link">← ホームに戻る</a>
     <div class="canvas-container">
         <canvas id="experiment"></canvas>
     </div>

@@ -93,6 +93,21 @@
             font-size: 0.9em;
             opacity: 0.8;
         }
+        .home-link {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: #333;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        .home-link:hover {
+            background: #555;
+        }
 
         .button-group {
             display: flex;
@@ -174,6 +189,7 @@
     </style>
 </head>
 <body>
+    <a href="index.html" class="home-link">← ホームに戻る</a>
     <div class="container">
         <h1>🎵 AI音楽ジェネレーター</h1>
         

@@ -25,12 +25,28 @@
             left: 10px;
             color: #333;
         }
+        .home-link {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: #333;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        .home-link:hover {
+            background: #555;
+        }
     </style>
 </head>
 <body>
     <div class="info">
         <p>猫が走り回る物理エンジン</p>
     </div>
+    <a href="index.html" class="home-link">← ホームに戻る</a>
     <canvas id="gameCanvas"></canvas>
     <script src="cat-physics.js"></script>
 </body>

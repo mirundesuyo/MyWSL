@@ -93,6 +93,23 @@
             border-radius: 10px;
         }
         
+        .home-link {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: #333;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background 0.3s ease;
+            z-index: 1000;
+        }
+        .home-link:hover {
+            background: #555;
+        }
+        
         #startButton {
             position: absolute;
             top: 50%;
@@ -129,6 +146,7 @@
     </style>
 </head>
 <body>
+    <a href="index.html" class="home-link">← ホームに戻る</a>
     <div id="gameContainer">
         <div id="gameArea"></div>
         <div id="scoreBoard">スコア: <span id="score">0</span></div>

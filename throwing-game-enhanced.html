@@ -117,9 +117,25 @@
             80% { transform: translateX(-50%) translateY(0); opacity: 1; }
             100% { transform: translateX(-50%) translateY(0); opacity: 0; }
         }
+        .home-link {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: #333;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+        .home-link:hover {
+            background: #555;
+        }
     </style>
 </head>
 <body>
+    <a href="index.html" class="home-link">← ホームに戻る</a>
     <div id="info">
         <h3>Ultimate 物理演算投げゲーム</h3>
         <p>スコア: <span id="score">0</span></p>
